@@ -1,0 +1,8 @@
+* @openstrux/spec
+/specs/core/        @openstrux/spec
+/specs/modules/     @openstrux/spec
+/specs/profiles/    @openstrux/spec
+/conformance/       @openstrux/spec
+/adr/               @openstrux/spec
+/reviews/           @openstrux/spec
+/changes/           @openstrux/spec

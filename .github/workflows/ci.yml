@@ -1,0 +1,20 @@
+name: Spec CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  spec-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate required structure
+        run: |
+          for f in specs/core/grammar.md specs/core/semantics.md specs/profiles/mvp.md changes/README.md; do
+            test -f "$f" || (echo "❌ Missing: $f" && exit 1)
+          done
+          echo "✅ Spec structure OK"
+      - name: Check for stub-only core files
+        run: |
+          count=$(grep -rl "Status: stub" specs/core/ | wc -l)
+          echo "⚠️  Stub files remaining: $count"
