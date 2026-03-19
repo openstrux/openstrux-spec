@@ -10,12 +10,13 @@ Expressions have two forms:
 | **Compiled** (strux AST) | Machine processing, pushdown, audit | Compiler | High (~30-60 tokens per predicate) |
 
 The shorthand is what you write. The strux AST (defined in
-`06-expressions.strux`) is what the compiler produces. Same principle as
+`expressions.strux`) is what the compiler produces. Same principle as
 everywhere else in OpenStrux: compact source, verbose derived output.
 
 ## Design
 
 SQL-like. Not because we're SQL-centric, but because:
+
 1. Every LLM knows SQL syntax — zero learning curve
 2. Every backend developer knows SQL — zero learning curve
 3. It's the most token-efficient predicate notation that exists
@@ -87,37 +88,7 @@ arg.predicate = kafka: partition IN (0, 1, 2)
 arg.predicate = fn: rods/my-filter/core.apply_gdpr_rules
 ```
 
-### Grammar (EBNF)
-
-```ebnf
-filter_expr   = portable_expr | prefixed_expr ;
-
-prefixed_expr = prefix ":" raw_content ;
-prefix        = "sql" | "mongo" | "kafka" | "fn" ;
-raw_content   = (* everything until end of line or closing delimiter *) ;
-
-portable_expr = or_expr ;
-or_expr       = and_expr { "OR" and_expr } ;
-and_expr      = not_expr { "AND" not_expr } ;
-not_expr      = "NOT" atom | atom ;
-atom          = compare | in_list | between | is_null | like
-              | exists | "(" or_expr ")" ;
-
-compare       = field_ref comp_op value ;
-comp_op       = "==" | "!=" | ">" | ">=" | "<" | "<=" ;
-in_list       = field_ref ["NOT"] "IN" "(" value { "," value } ")" ;
-between       = field_ref "BETWEEN" value "AND" value ;
-is_null       = field_ref "IS" ["NOT"] "NULL" ;
-like          = field_ref ["NOT"] "LIKE" string ;
-exists        = field_ref "EXISTS" ;
-
-field_ref     = name { "." name } ;
-value         = string | number | bool | "null" | env_ref ;
-string        = '"' chars '"' ;
-number        = digit { digit } [ "." digit { digit } ] ;
-bool          = "true" | "false" ;
-env_ref       = "env(" '"' name '"' ")" ;
-```
+Formal EBNF: see [grammar.md §7 — Filter](grammar.md).
 
 ---
 
@@ -151,20 +122,7 @@ arg.fields = sql: id, email, EXTRACT(YEAR FROM created_at) AS year, AGE(NOW(), d
 arg.fields = fn: rods/my-transform/core.project_fields
 ```
 
-### Grammar
-
-```ebnf
-projection      = "[" field_entry { "," field_entry } "]" | prefixed_expr ;
-field_entry     = "*" | exclude | select | computed ;
-exclude         = "-" field_ref ;
-select          = field_ref [ "AS" name ] ;
-computed        = scalar_expr "AS" name ;
-scalar_expr     = field_ref | literal | arithmetic | coalesce | case_when ;
-arithmetic      = scalar_expr arith_op scalar_expr ;
-arith_op        = "+" | "-" | "*" | "/" | "%" ;
-coalesce        = "COALESCE(" scalar_expr { "," scalar_expr } ")" ;
-case_when       = "CASE" { "WHEN" filter_expr "THEN" scalar_expr } "ELSE" scalar_expr "END" ;
-```
+Formal EBNF: see [grammar.md §7 — Projection](grammar.md).
 
 ---
 
@@ -201,16 +159,7 @@ arg.fn = mongo: {"$sum": "$amount"}
 arg.fn = fn: rods/my-agg/core.custom_rollup
 ```
 
-### Grammar
-
-```ebnf
-aggregation   = single_agg | multi_agg | prefixed_expr ;
-multi_agg     = "[" single_agg { "," single_agg } "]" ;
-single_agg    = agg_fn "(" agg_arg ")" [ "AS" name ] ;
-agg_fn        = "COUNT" | "SUM" | "AVG" | "MIN" | "MAX"
-              | "FIRST" | "LAST" | "COLLECT" ;
-agg_arg       = "*" | ["DISTINCT"] field_ref ;
-```
+Formal EBNF: see [grammar.md §7 — Aggregation](grammar.md).
 
 ---
 
@@ -237,13 +186,7 @@ arg.key = sql: CUBE(year, quarter, region)
 arg.key = fn: rods/my-group/core.compute_bucket
 ```
 
-### Grammar
-
-```ebnf
-group_key     = key_entry { "," key_entry } | prefixed_expr ;
-key_entry     = field_ref | function_call ;
-function_call = name "(" field_ref ")" ;
-```
+Formal EBNF: see [grammar.md §7 — Group Key](grammar.md).
 
 ---
 
@@ -265,13 +208,7 @@ arg.on = sql: a.id = b.user_id AND a.region = b.region
 arg.on = fn: rods/my-join/core.fuzzy_match
 ```
 
-### Grammar
-
-```ebnf
-join_cond     = key_match { "AND" key_match } | prefixed_expr ;
-key_match     = qualified_ref "==" qualified_ref ;
-qualified_ref = ("left" | "right") "." field_ref ;
-```
+Formal EBNF: see [grammar.md §7 — Join Condition](grammar.md).
 
 ---
 
@@ -293,12 +230,7 @@ arg.order = score DESC NULLS LAST, id ASC
 arg.order = sql: created_at DESC NULLS LAST, id ASC
 ```
 
-### Grammar
-
-```ebnf
-order_expr    = order_field { "," order_field } | prefixed_expr ;
-order_field   = field_ref [ "ASC" | "DESC" ] [ "NULLS" ( "FIRST" | "LAST" ) ] ;
-```
+Formal EBNF: see [grammar.md §7 — Sort](grammar.md).
 
 ---
 
@@ -318,12 +250,7 @@ arg.routes = {
 The `*` route is the default — catches anything not matched above.
 Routes are evaluated in order; first match wins.
 
-### Grammar
-
-```ebnf
-routes        = "{" { route_entry } "}" ;
-route_entry   = name ":" ( filter_expr | "*" ) ;
-```
+Formal EBNF: see [grammar.md §7 — Split Routes](grammar.md).
 
 ---
 
@@ -366,22 +293,7 @@ HAS ANY      — collection contains at least one of values
 HAS ALL      — collection contains all of values
 ```
 
-### Grammar
-
-```ebnf
-policy_expr   = guard_or_expr | prefixed_expr ;
-guard_or_expr = guard_and_expr { "OR" guard_and_expr } ;
-guard_and_expr = guard_atom { "AND" guard_atom } ;
-guard_atom    = context_compare | has_check | filter_atom ;
-
-context_compare = context_ref comp_op value ;
-context_ref     = ("principal" | "intent" | "scope" | "element") "." field_ref ;
-
-has_check     = context_ref "HAS" ( value | "ANY" value_list | "ALL" value_list ) ;
-value_list    = "(" value { "," value } ")" ;
-
-filter_atom   = (* same as portable filter atoms *) ;
-```
+Formal EBNF: see [grammar.md §7 — Guard Policy](grammar.md).
 
 ---
 
@@ -420,12 +332,14 @@ After parsing, the compiler checks the snap graph:
 ```
 
 Steps:
+
 1. `f.in.data` snapped from `db.out.rows` → upstream source is `db.sql.postgres`
 2. `f.arg.predicate` is `PortableFilter` → compatible with ANY source → ✓
 3. Mark for pushdown: `f` can be fused with `db`
 4. Physical plan: `SELECT * FROM users WHERE address_country = 'ES'`
 
 If instead:
+
 ```
 arg.predicate = mongo: {"country": "ES"}          // Mongo-specific
 snap db.out.rows -> in.data                       // upstream is Postgres
@@ -451,12 +365,14 @@ snap g.out.grouped -> a.in.grouped
 ```
 
 Compiler analysis:
+
 1. `f` → PortableFilter → pushable to SQL → fuse with `db`
 2. `t` → PortableProjection → pushable to SQL → extend fusion
 3. `g` → PortableGroupKey → pushable to SQL → extend fusion
 4. `a` → PortableAgg (COUNT, AVG = builtins) → pushable to SQL → extend fusion
 
 Physical plan (single query):
+
 ```sql
 SELECT country, COUNT(*) AS total, AVG(age) AS avg_age
 FROM users
@@ -479,6 +395,7 @@ Five logical rods → one SQL query. Logical plan preserved for audit.
 3. `a` → pushable but no upstream source to fuse with → executes in memory
 
 Physical plan:
+
 ```
 SQL: SELECT * FROM users WHERE active = true    (f fused with source)
 In-memory: apply enrich function                (t executes in rod)
@@ -502,12 +419,13 @@ WARNING: t uses FunctionRef — consider portable expression for better pushdown
 
 ---
 
-## 10. Relation to 06-expressions.strux
+## 10. Relation to expressions.strux
 
-`06-expressions.strux` defines the **compiled form** (strux AST).
+`expressions.strux` defines the **compiled form** (strux AST).
 This document defines the **source form** (shorthand).
 
 The shorthand compiles to the AST. The AST is what appears in:
+
 - `mf.strux.json` (compiled manifest)
 - `snap.lock` (locked expressions)
 - Audit outputs (lineage, Art. 30)
@@ -526,69 +444,12 @@ The AST is never written by hand. It's a compiler output.
 
 ---
 
-## 11. Full Panel Example (Shorthand)
+## 11. Full Panel Example
 
-```
-@panel user-analytics {
-
-  @dp {
-    controller: "MiEmpresa SL"
-    controller_id: "ES-B12345678"
-    dpo: "dpo@miempresa.es"
-    record: "RPA-2026-003"
-  }
-
-  @access {
-    intent: { purpose: "geo_segmentation", basis: "legitimate_interest", operation: "read" }
-    scope: policy("data-engineering-read")
-  }
-
-  @rod db = read-data {
-    cfg.source = db.sql.postgres {
-      host: env("DB_HOST")
-      port: 5432
-      db_name: "production"
-      tls: true
-      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/mi/secrets/pg" }
-    }
-    cfg.mode = "scan"
-  }
-
-  @rod f = filter {
-    arg.predicate = address.country IN ("ES", "FR", "DE") AND deleted_at IS NULL
-    snap db.out.rows -> in.data
-  }
-
-  @rod p = pseudonymize {
-    cfg.algo = "sha256"
-    arg.fields = ["full_name", "email", "national_id"]
-    snap f.out.match -> in.data
-  }
-
-  @rod sink = write-data {
-    cfg.target = db.sql.bigquery {
-      project: "miempresa-analytics"
-      dataset: "eu_users"
-      location: "EU"
-      credentials: adc {}
-    }
-    snap p.out.masked -> in.rows
-  }
-
-  @rod dlq = write-data {
-    cfg.target = stream.pubsub { project: "miempresa", topic: "dlq" }
-    snap f.out.reject -> in.elements
-  }
-}
-```
-
-39 lines (spaced format). Filters are one-liners. No AST nesting.
-Every LLM can generate this on first shot.
-
-### Normal Format (recommended — 27 lines)
-
-Inline `@dp`/`@access`, comma-separate simple cfg fields, no blank
-lines between rods. Same semantics, meets 30-line SHOULD threshold:
+Self-contained verbose form (27 lines, ~336 tokens). Same panel
+appears in shorthand form in [panel-shorthand.md](panel-shorthand.md)
+and with context inheritance in
+[config-inheritance.md](config-inheritance.md).
 
 ```
 @panel user-analytics {

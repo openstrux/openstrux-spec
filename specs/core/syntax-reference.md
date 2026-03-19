@@ -4,12 +4,12 @@ Target: LLM system prompt context. Budget: ~2,500 tokens.
 
 ---
 
-## Strux Forms
+## Type Forms
 
 ```
-@strux Name { field: Type, field2: Type }                    // record
-@strux Name = enum { val1, val2, val3 }                      // enum
-@strux Name = union { tag1: Type1, tag2: Type2 }             // union
+@type Name { field: Type, field2: Type }                    // record
+@type Name = enum { val1, val2, val3 }                      // enum
+@type Name = union { tag1: Type1, tag2: Type2 }             // union
 ```
 
 Primitives: `string`, `number`, `bool`, `date`, `bytes`.
@@ -35,6 +35,7 @@ Wildcards: `db.sql.*` (any SQL), `db.*` (any DB), `*` (any).
 ## 18 Basic Rods
 
 ### I/O — Data
+
 | Rod | cfg | arg | in | out | err |
 |-----|-----|-----|----|-----|-----|
 | `read-data` | source: DataSource, mode: ReadMode | predicate?, fields?, limit? | — | rows/elements, meta | failure |
@@ -43,6 +44,7 @@ Wildcards: `db.sql.*` (any SQL), `db.*` (any DB), `*` (any).
 ReadMode: `scan`, `lookup`, `multi_lookup`, `query`, `stream`.
 
 ### I/O — Service
+
 | Rod | cfg | arg | in | out | err |
 |-----|-----|-----|----|-----|-----|
 | `receive` | trigger: Trigger | timeout? | — | request, context | invalid |
@@ -54,6 +56,7 @@ ServiceTarget: `http{base_url,auth?,tls}`, `grpc{host,port,proto,tls}`, `functio
 CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `invoke`.
 
 ### Computation
+
 | Rod | Key knots |
 |-----|-----------|
 | `transform` | cfg.mode: map\|flat_map\|project, arg.fields/fn, in.data→out.data |
@@ -65,12 +68,14 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 | `window` | cfg.kind: fixed\|sliding\|session, cfg.size, in.data→out.windowed |
 
 ### Control
+
 | Rod | Key knots |
 |-----|-----------|
 | `guard` | cfg.policy: PolicyRef, arg.policy (shorthand), in.data→out.allowed+out.modified, err.denied |
 | `store` | cfg.backend: StateBackend, cfg.mode: get\|put\|delete\|cas\|increment, in.key+in.value?→out.result |
 
 ### Compliance
+
 | Rod | Key knots |
 |-----|-----------|
 | `validate` | cfg.schema, in.data→out.valid, err.invalid |
@@ -78,6 +83,7 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 | `encrypt` | cfg.key_ref, arg.fields, in.data→out.encrypted |
 
 ### Topology
+
 | Rod | Key knots |
 |-----|-----------|
 | `split` | arg.routes, in.data→out.{route_name}... |
@@ -96,6 +102,7 @@ SecretRef providers: `gcp_secret_manager`, `aws_secrets_manager`, `vault`, `env`
 Expressions use SQL-like syntax. Source-specific prefixes: `sql:`, `mongo:`, `kafka:`, `fn:`, `opa:`, `cedar:`.
 
 ### Filter (arg.predicate)
+
 ```
 field == "val"                              // compare (==, !=, >, >=, <, <=)
 a AND b, a OR b, NOT a, (a OR b) AND c     // logic
@@ -109,6 +116,7 @@ fn: mod/core.my_filter                      // function ref (no pushdown)
 ```
 
 ### Projection (arg.fields)
+
 ```
 [id, email, address.country AS country]                    // select + rename
 [*, -password_hash, -internal_id]                          // exclude
@@ -116,6 +124,7 @@ fn: mod/core.my_filter                      // function ref (no pushdown)
 ```
 
 ### Aggregation (arg.fn)
+
 ```
 COUNT(*), SUM(amount), AVG(score), MIN(x), MAX(x)         // single
 COUNT(DISTINCT country)                                     // distinct
@@ -123,26 +132,31 @@ COUNT(DISTINCT country)                                     // distinct
 ```
 
 ### Group Key (arg.key)
+
 ```
 country, YEAR(created_at)                   // field + function
 ```
 
 ### Join (arg.on)
+
 ```
 left.user_id == right.id AND left.tenant == right.tenant
 ```
 
 ### Sort (arg.order)
+
 ```
 created_at DESC NULLS LAST, id ASC
 ```
 
 ### Split Routes (arg.routes)
+
 ```
 { eu: country IN ("ES","FR","DE"), us: country == "US", other: * }
 ```
 
 ### Guard Policy (arg.policy)
+
 ```
 principal.roles HAS "admin"                                // role check
 principal.roles HAS ANY ("admin","dpo")                    // any-of

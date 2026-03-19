@@ -2,7 +2,7 @@
 
 ## What Changed from v0.3
 
-### 1. Union Types (new strux form)
+### 1. Union Types (new type form)
 
 v0.3 had records and enums. v0.4 adds **discriminated unions** — tagged sum
 types where each variant carries its own typed payload. This is the single
@@ -10,6 +10,7 @@ biggest conceptual change: it turns flat enum-based `cfg` values into
 hierarchical, self-documenting type trees.
 
 **Before (v0.3):**
+
 ```
 cfg:  db    string  ["postgres", "mysql"]
 arg:  host  string
@@ -18,6 +19,7 @@ arg:  tls   bool
 ```
 
 **After (v0.4):**
+
 ```
 cfg:  source  DataSource    // union: db.sql.postgres carries PostgresConfig
 ```
@@ -33,6 +35,7 @@ was external to the graph. v0.4 makes AccessContext an **implicit knot** —
 available to every rod without explicit wiring.
 
 This is inspired by:
+
 - **Spark**: `SparkSession` is ambient — every operation has access to it
 - **Beam**: `PipelineOptions` propagate implicitly
 - **Prisma**: Middleware has access to the full request context
@@ -53,19 +56,13 @@ any `DataSource` variant (streams, SQL, NoSQL). This is possible because:
 
 ### 4. Adapters (new concept)
 
-v0.3's rod `core.py` contained both logic and I/O code. v0.4 separates them:
+v0.3's rod `core.py` contained both logic and I/O code. v0.4 separates
+rod cores (pure logic) from adapters (I/O). See
+[type-system.md §5](type-system.md) for registration syntax and
+resolution chain.
 
-- **Rod core**: Pure function — authorization, field masking, error routing
-- **Adapter**: I/O implementation — the thing that talks to Postgres, Kafka, etc.
-
-Adapters are:
-- Registered per union leaf type + translation target
-- Versioned and certified independently of rods
-- Published to the hub like any other artifact
-
-This mirrors how Prisma has "engines" (query engine, migration engine) that
-are separate from the client, and how Beam has IO connectors separate from
-the pipeline definition.
+This mirrors how Prisma has "engines" separate from the client, and how
+Beam has IO connectors separate from the pipeline definition.
 
 ---
 
@@ -117,6 +114,7 @@ source-specific config. That's exactly what our union type captures.
 ### Why adapters are separate from rod cores?
 
 Separation of concerns:
+
 - Rod core is **pure logic**: testable without infrastructure
 - Adapter is **I/O**: requires real connections to test
 - Different certification profiles: rod core can be "tested", adapter needs "security" certification
@@ -130,7 +128,7 @@ Separation of concerns:
 
 | Question | Resolution |
 |----------|-----------|
-| write-data rod | Listed in `05-basic-rods.md`. Symmetric to read-data with DataTarget union |
+| write-data rod | Listed in `../modules/rods/overview.md`. Symmetric to read-data with DataTarget union |
 | AccessContext in patterns | Yes, propagates with scope narrowing at each level |
 | Cross-datasource joins | Each read-data evaluates independently; merge inherits intersection |
 

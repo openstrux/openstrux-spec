@@ -24,13 +24,13 @@
 //
 // Design: leaf configs carry ONLY backend-specific fields.
 // Common fields (timeout, retry) belong to @ops.
-// State-of-art comparison: see 04-design-notes.md.
+// State-of-art comparison: see design-notes.md.
 // ============================================================================
 
 
 // --- Top-level union ---
 
-@strux DataSource = union {
+@type DataSource = union {
   stream:  StreamSource
   db:      DbSource
 }
@@ -40,13 +40,13 @@
 // STREAM SOURCES
 // =====================
 
-@strux StreamSource = union {
+@type StreamSource = union {
   kafka:    KafkaConfig
   pubsub:   PubSubConfig
   kinesis:  KinesisConfig
 }
 
-@strux KafkaConfig {
+@type KafkaConfig {
   brokers:        Batch<string>                 // e.g., ["broker1:9092", "broker2:9092"]
   topic:          string
   group_id:       Optional<string>              // consumer group
@@ -55,45 +55,45 @@
   auth:           Optional<KafkaAuth>
 }
 
-@strux KafkaOffset = enum { earliest, latest, committed }
+@type KafkaOffset = enum { earliest, latest, committed }
 
-@strux KafkaAuth = union {
+@type KafkaAuth = union {
   sasl:     KafkaSaslAuth
   mtls:     KafkaMtlsAuth
 }
 
-@strux KafkaSaslAuth {
+@type KafkaSaslAuth {
   mechanism:  string                            // PLAIN, SCRAM-SHA-256, etc.
   username:   string
   password:   string                            @sec:enc("required")
 }
 
-@strux KafkaMtlsAuth {
+@type KafkaMtlsAuth {
   cert_path:  string
   key_path:   string
   ca_path:    string
 }
 
-@strux PubSubConfig {
+@type PubSubConfig {
   project:        string                        // GCP project ID
   subscription:   Optional<string>              // read from subscription
   topic:          Optional<string>              // or read from topic (creates temp sub)
 }
 
-@strux KinesisConfig {
+@type KinesisConfig {
   stream_name:    string
   region:         string                        // AWS region
   start_position: KinesisStart
 }
 
-@strux KinesisStart = enum { trim_horizon, latest, at_timestamp }
+@type KinesisStart = enum { trim_horizon, latest, at_timestamp }
 
 
 // =====================
 // DATABASE SOURCES
 // =====================
 
-@strux DbSource = union {
+@type DbSource = union {
   sql:    SqlSource
   nosql:  NoSqlSource
 }
@@ -101,13 +101,13 @@
 
 // --- SQL ---
 
-@strux SqlSource = union {
+@type SqlSource = union {
   postgres:   PostgresConfig
   mysql:      MySqlConfig
   bigquery:   BigQueryConfig
 }
 
-@strux PostgresConfig {
+@type PostgresConfig {
   host:         string
   port:         number    [1..65535]
   db_name:      string
@@ -118,9 +118,9 @@
   credentials:  DbCredentials                   @sec:enc("required")
 }
 
-@strux PostgresSslMode = enum { disable, allow, prefer, require, verify_ca, verify_full }
+@type PostgresSslMode = enum { disable, allow, prefer, require, verify_ca, verify_full }
 
-@strux MySqlConfig {
+@type MySqlConfig {
   host:         string
   port:         number    [1..65535]
   db_name:      string
@@ -129,7 +129,7 @@
   credentials:  DbCredentials                   @sec:enc("required")
 }
 
-@strux BigQueryConfig {
+@type BigQueryConfig {
   project:      string
   dataset:      string
   location:     Optional<string>                // e.g., "EU", "US"
@@ -138,82 +138,82 @@
 
 // Shared credential types
 
-@strux DbCredentials = union {
+@type DbCredentials = union {
   user_pass:      UserPassCredentials
   iam:            IamCredentials
   secret_ref:     SecretReference
 }
 
-@strux UserPassCredentials {
+@type UserPassCredentials {
   username:   string
   password:   string                            @sec:enc("required")
 }
 
-@strux IamCredentials {
+@type IamCredentials {
   service_account:  Optional<string>            // if not set, uses default/ambient
 }
 
-@strux GcpCredentials = union {
+@type GcpCredentials = union {
   service_account:  GcpServiceAccount
   adc:              GcpAdc                      // Application Default Credentials
 }
 
-@strux GcpServiceAccount {
+@type GcpServiceAccount {
   key_file:     string                          @sec:enc("required")
 }
 
-@strux GcpAdc {}                                // empty — uses ambient credentials
+@type GcpAdc {}                                // empty — uses ambient credentials
 
-@strux SecretReference {
+@type SecretReference {
   provider:     SecretProvider
   path:         string                          // e.g., "projects/my-proj/secrets/db-pass"
 }
 
-@strux SecretProvider = enum { gcp_secret_manager, aws_secrets_manager, vault, env }
+@type SecretProvider = enum { gcp_secret_manager, aws_secrets_manager, vault, env }
 
 
 // --- NoSQL ---
 
-@strux NoSqlSource = union {
+@type NoSqlSource = union {
   mongodb:    MongoConfig
   dynamodb:   DynamoConfig
   firestore:  FirestoreConfig
 }
 
-@strux MongoConfig {
+@type MongoConfig {
   connection_uri:   string                      @sec:enc("required")
   database:         string
   auth_source:      Optional<string>            // defaults to "admin"
   tls:              bool
 }
 
-@strux DynamoConfig {
+@type DynamoConfig {
   table_name:     string
   region:         string
   endpoint:       Optional<string>              // for local DynamoDB
   credentials:    AwsCredentials                @sec:enc("required")
 }
 
-@strux AwsCredentials = union {
+@type AwsCredentials = union {
   access_key:   AwsAccessKey
   iam_role:     AwsIamRole
   profile:      AwsProfile
 }
 
-@strux AwsAccessKey {
+@type AwsAccessKey {
   access_key_id:      string
   secret_access_key:  string                    @sec:enc("required")
 }
 
-@strux AwsIamRole {
+@type AwsIamRole {
   role_arn:     string
 }
 
-@strux AwsProfile {
+@type AwsProfile {
   profile_name: string
 }
 
-@strux FirestoreConfig {
+@type FirestoreConfig {
   project:      string
   collection:   string
   credentials:  GcpCredentials                  @sec:enc("required")
@@ -222,4 +222,4 @@
 
 // Usage: cfg.source = db.sql.postgres { ... }
 // Type path determines: adapter, cert scope, @sec requirements.
-// Full examples: see 08-expression-shorthand.md.
+// Full examples: see expression-shorthand.md.

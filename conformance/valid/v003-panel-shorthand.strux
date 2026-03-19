@@ -1,0 +1,17 @@
+// fixture: v003-panel-shorthand
+// expect: valid
+// covers: shorthand syntax (no @rod, no cfg./arg. prefix, implicit chain)
+
+@type UserRecord {
+  id:      number
+  email:   string
+  country: string
+}
+
+@panel filter-users {
+  @dp { controller: "TestCo", record: "TEST-002" }
+  @access { purpose: "analytics", operation: "read" }
+  db = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "test", tls: false }, mode: "scan" }
+  f = filter { predicate: country == "ES" AND email IS NOT NULL }
+  sink = write-data { target: db.sql.bigquery { project: "test", location: "EU" } }
+}

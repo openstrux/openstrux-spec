@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# Ensure npm global binaries are on PATH (matches 00-install-packages.sh)
+if command -v npm &>/dev/null; then
+  NPM_PREFIX="$(npm prefix -g 2>/dev/null)"
+  export PATH="$PATH:$NPM_PREFIX/bin"
+fi
+
 PASS=0
 FAIL=0
 
@@ -24,7 +30,7 @@ else
 fi
 
 # 2. Stub sections — hard fail
-STUBS=$(grep -rl "Status: stub" specs/ 2>/dev/null | wc -l | tr -d ' ')
+STUBS=$( (grep -rl "Status: stub" specs/ 2>/dev/null || true) | wc -l | tr -d ' ')
 if [ "$STUBS" -eq 0 ]; then
   ok "No stub sections in specs/"
 else

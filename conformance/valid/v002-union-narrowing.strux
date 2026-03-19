@@ -1,0 +1,33 @@
+// fixture: v002-union-narrowing
+// expect: valid
+// covers: union declaration, type path narrowing, panel with rod
+
+@type PostgresConfig {
+  host:    string
+  port:    number
+  db_name: string
+  tls:     bool
+}
+
+@type SqlSource = union {
+  postgres: PostgresConfig
+}
+
+@type DbSource = union {
+  sql: SqlSource
+}
+
+@type DataSource = union {
+  db: DbSource
+}
+
+@panel read-users {
+  @dp { controller: "TestCo", record: "TEST-001" }
+  @access { purpose: "testing", operation: "read" }
+  db = read-data {
+    source: db.sql.postgres {
+      host: "localhost", port: 5432, db_name: "test", tls: false
+    }
+    mode: "scan"
+  }
+}

@@ -111,7 +111,9 @@ acquire logic from ancestors.
 
 ## 2. Panel with Inherited Context
 
-Given the `strux.context` above, the reference panel becomes:
+Given the `strux.context` above, the reference panel becomes
+(same panel in verbose form: [expression-shorthand.md §11](expression-shorthand.md);
+in shorthand: [panel-shorthand.md](panel-shorthand.md)):
 
 ```
 @panel user-analytics {
@@ -197,7 +199,7 @@ context value. This is **field-level merge**, not replacement.
 ## 5. `@access` Narrowing
 
 Access context follows the **scope-narrowing** principle from
-`01-access-context.strux`: child scopes can only be **equal or more
+`access-context.strux`: child scopes can only be **equal or more
 restrictive** than parent scopes.
 
 ```
@@ -212,6 +214,7 @@ restrictive** than parent scopes.
 ```
 
 Compile errors if panel tries to widen:
+
 ```
 // Context scope: policy("default-read")
 // Panel scope: policy("admin-full-access")  ← COMPILE ERROR: widening scope
@@ -286,6 +289,7 @@ flattens everything:
 ```
 
 This means:
+
 - **Audit** always sees the full picture — no hidden inheritance
 - **Certification** evaluates the resolved config, not the source shorthand
 - **Runtime** has no concept of inheritance — pure flat config
@@ -359,9 +363,10 @@ ratio would be ~0.12. Well under the 0.25 MUST threshold.
 
 ## 11. Design Principles
 
-### Source is compact. Compiled is complete.
+### Source is compact. Compiled is complete
 
 This is the same principle everywhere in v0.4:
+
 - **Expressions**: shorthand (compact) → AST (complete)
 - **Config**: context-inherited (compact) → resolved manifest (complete)
 - **Types**: union path `db.sql.postgres` (compact) → full PostgresConfig (complete)

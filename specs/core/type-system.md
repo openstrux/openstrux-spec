@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-v0.3 has `@strux` for records and `enum` for flat enumerations. But real-world
+v0.3 has `@type` for records and `enum` for flat enumerations. But real-world
 data access requires **type hierarchies**: a datasource is either a stream or a
 database; a database is either SQL or NoSQL; SQL is either Postgres or MySQL.
 
@@ -17,7 +17,7 @@ OpenStrux as `union`.
 ### Syntax
 
 ```
-@strux DataSource = union {
+@type DataSource = union {
   stream:  StreamSource
   db:      DbSource
 }
@@ -28,27 +28,10 @@ any valid strux (record, enum, union, or primitive).
 
 ### Nesting
 
-Unions nest. The full datasource tree:
-
-```
-DataSource
-├── stream: StreamSource
-│   ├── kafka:    KafkaConfig
-│   ├── pubsub:   PubSubConfig
-│   └── kinesis:  KinesisConfig
-└── db: DbSource
-    ├── sql: SqlSource
-    │   ├── postgres: PostgresConfig
-    │   ├── mysql:    MySqlConfig
-    │   └── bigquery: BigQueryConfig
-    └── nosql: NoSqlSource
-        ├── mongodb:   MongoConfig
-        ├── dynamodb:  DynamoConfig
-        └── firestore: FirestoreConfig
-```
-
-This tree is **defined once** as strux types. Every rod that needs a datasource
-references these types — it doesn't reinvent them.
+Unions nest. The full DataSource tree is defined in
+[datasource-hierarchy.strux](../modules/datasource-hierarchy.strux).
+Every rod that needs a datasource references these types — it doesn't
+reinvent them.
 
 ### Type Narrowing
 
@@ -67,22 +50,22 @@ runtime branching on datasource kind.
 
 | v0.3 (enum)                              | v0.4 (union)                         |
 |------------------------------------------|--------------------------------------|
-| `@strux DbType = enum { postgres, mysql }` | `@strux SqlSource = union { postgres: PostgresConfig, mysql: MySqlConfig }` |
+| `@type DbType = enum { postgres, mysql }` | `@type SqlSource = union { postgres: PostgresConfig, mysql: MySqlConfig }` |
 | Flat list of string values               | Each variant carries its own config  |
 | Rod must interpret string + guess config | Rod receives typed, validated config |
 | No hierarchy                             | Composable tree of types             |
 
 ---
 
-## 2. Three Kinds of Strux
+## 2. Three Type Forms
 
-After this refinement, OpenStrux has three strux forms:
+After this refinement, OpenStrux has three `@type` forms:
 
 | Form     | Purpose                          | Example                                |
 |----------|----------------------------------|----------------------------------------|
-| `record` | Typed data structure (fields)    | `@strux PersonalData { ... }`          |
-| `enum`   | Flat set of named values         | `@strux DpBasis = enum { consent, contract }` |
-| `union`  | Discriminated union (tagged sum) | `@strux DataSource = union { stream: ..., db: ... }` |
+| `record` | Typed data structure (fields)    | `@type PersonalData { ... }`          |
+| `enum`   | Flat set of named values         | `@type DpBasis = enum { consent, contract }` |
+| `union`  | Discriminated union (tagged sum) | `@type DataSource = union { stream: ..., db: ... }` |
 
 The default form is `record`. Explicit keyword required for `enum` and `union`.
 
@@ -100,6 +83,7 @@ DataSource.db.nosql.mongodb  →   MongoConfig
 ```
 
 Type paths are used in:
+
 - `cfg` value assignment: `cfg.source = db.sql.postgres { host: "...", port: 5432 }`
 - `@when` conditions: `@when(cfg.source:db.sql)` — true for any SQL variant
 - Certification scope: `{ source: "db.sql.postgres" }` or `{ source: "db.sql.*" }`
@@ -115,6 +99,7 @@ db.*               — any database
 ```
 
 This enables certification at any level of specificity:
+
 - "Tested with Postgres" → `{ source: "db.sql.postgres" }`
 - "Tested with any SQL" → `{ source: "db.sql.*" }`
 
@@ -149,6 +134,7 @@ values. The datasource config is now a single typed, validated structure.
 | Different cfg = different cert scope      | Same: different source path = different cert scope |
 
 Benefits:
+
 - **Type safety**: PostgresConfig requires `host`, `port`, `db_name` — compiler catches missing fields
 - **One-shot validation**: The full config is validated at compile time
 - **Adapter resolution**: The type path `db.sql.postgres` deterministically selects the adapter
@@ -184,6 +170,7 @@ Each leaf type in a union can have a registered adapter:
 ```
 
 Adapters are:
+
 - **Per union leaf**: PostgresConfig has its own, MongoConfig has its own
 - **Per translation target**: Beam Python gets one adapter, TypeScript gets another
 - **Registered in hub**: Shared, versioned, certified just like rods
@@ -207,46 +194,29 @@ Generated code: ReadFromJdbc(jdbc_url="jdbc:postgresql://...")
 
 ## 6. Relation to State of the Art
 
-| Framework      | What OpenStrux borrows                                    |
-|----------------|-----------------------------------------------------------|
-| **Prisma**     | Schema-first datasource config, type-safe client generation, provider = discriminant |
-| **Apache Beam**| Unified Source/Sink abstraction, PCollection typing, DoFn = rod core |
-| **Spark V2**   | DataSource API with pushdown predicates, catalog integration |
-| **dbt**        | Adapter pattern per warehouse, profile = typed config      |
-| **Terraform**  | Provider = discriminated union of cloud configs            |
+See [design-notes.md §State of the Art](design-notes.md) for the full
+comparison to Prisma, Beam, Spark, dbt, and Terraform.
 
-### What OpenStrux adds
-
-None of the above have **built-in access control + intent** at the type level.
-In Prisma, authorization is middleware you bolt on. In Beam, it's external.
-In OpenStrux, the `AccessContext` (principal + intent) is a first-class knot
-that the rod evaluates before delegating to the adapter. See `01-access-context.strux`.
+The key differentiator: none of the above have built-in access control
+and intent at the type level. See
+[access-context.strux](access-context.strux).
 
 ---
 
-## 7. Grammar Extension (EBNF)
+## 7. Grammar
 
-```ebnf
-strux_def   = "@strux" name "=" "union" "{" union_body "}"
-            | "@strux" name "=" "enum" "{" enum_body "}"
-            | "@strux" name "{" record_body "}" ;
-
-union_body  = { variant } ;
-variant     = name ":" type ;
-
-type_path   = name { "." name } ;
-path_match  = type_path | type_path ".*" | "*" ;
-```
+Formal EBNF for type definitions: see [grammar.md §2](grammar.md).
 
 ---
 
 ## 8. Migration from v0.3
 
-Existing v0.3 `@strux` records and enums are unchanged. The only new form is
+Existing v0.3 `@type` records and enums are unchanged. The only new form is
 `union`. Existing rods like `read-db` with `cfg.db = "postgres"` still work —
 but the recommended pattern is to migrate to union-typed cfg knots.
 
 The v0.3 `read-db` rod becomes the v0.4 `read-data` rod:
+
 - `read-db` → `read-data` (broader: handles streams too, not just databases)
 - `cfg.db string ["postgres", "mysql"]` → `cfg.source DataSource`
 - Separate `arg.*` for connection → typed config inside the union variant

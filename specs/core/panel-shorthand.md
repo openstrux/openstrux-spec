@@ -104,6 +104,7 @@ dlq = write-data { target: @dlq, from: f.reject }
 The `out.` prefix is dropped (you always read from outputs).
 
 For multi-input rods (join, merge):
+
 ```
 j = join { mode: "inner", on: left.id == right.id, from: [users, orders] }
 //   ↑ first = left, second = right
@@ -141,24 +142,18 @@ correct sub-structure. If there's ambiguity, use the full form.
 }
 ```
 
-**9 lines. ~142 tokens.**
+**9 lines. ~142 tokens.** Same panel in verbose form: see
+[expression-shorthand.md §11](expression-shorthand.md). With context
+inheritance: see [config-inheritance.md §2](config-inheritance.md).
 
 ---
 
 ## Comparison
 
-| Variant | Lines | Tokens | Context needed |
-|---------|-------|--------|----------------|
-| v0.3 panel | 28 | ~170 | No |
-| v0.4 self-contained (verbose) | 39 | ~325 | No |
-| v0.4 self-contained (normal) | 27 | ~336 | No |
-| v0.4 with context (current syntax) | 18 | ~209 | Yes |
-| **v0.4 with context + shorthand** | **9** | **~142** | Yes |
-| v0.4 shorthand, amortized (10 panels) | 9 | ~160 | Yes |
-
-At 142 tokens the panel is **17% more compact than v0.3** while
-carrying access control, typed credentials, expression pushdown,
-and GDPR compliance — none of which v0.3 had.
+**9 lines, ~142 tokens** — 17% more compact than v0.3 while carrying
+access control, typed credentials, expression pushdown, and GDPR
+compliance. Full token budget comparison: see
+[config-inheritance.md §10](config-inheritance.md).
 
 ---
 

@@ -4,7 +4,7 @@
 
 | Concept | File | What it is |
 |---------|------|------------|
-| Union types | `00-strux-type-system.md` | Discriminated unions — third strux form alongside record and enum |
+| Union types | `00-strux-type-system.md` | Discriminated unions — third type form alongside record and enum |
 | Type paths | `00-strux-type-system.md` | Dot-separated paths through union trees (`db.sql.postgres`) |
 | Adapters | `00-strux-type-system.md` | Per-leaf, per-target I/O implementations — separate from rod logic |
 | AccessContext | `01-access-context.strux` | Implicit context: Principal (who) + Intent (why) + Scope (what) |
@@ -21,9 +21,9 @@
 
 | v0.3 | v0.4 | Migration |
 |------|------|-----------|
-| `@strux X = enum { a, b }` | Unchanged | Enums still work as-is |
-| `@strux X { fields }` | Unchanged | Records still work as-is |
-| No union types | `@strux X = union { tag: Type }` | New syntax, additive |
+| `@type X = enum { a, b }` | Unchanged | Enums still work as-is |
+| `@type X { fields }` | Unchanged | Records still work as-is |
+| No union types | `@type X = union { tag: Type }` | New syntax, additive |
 | `cfg.db string ["postgres"]` | `cfg.source DataSource` | Migrate to union-typed cfg |
 | `arg.host`, `arg.port` (loose) | Part of `PostgresConfig` (in union) | Config moves inside union variant |
 | `read-db` rod | `read-data` rod | Broader scope, same pattern |

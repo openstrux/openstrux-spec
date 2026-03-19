@@ -1,0 +1,35 @@
+// fixture: i002-missing-required-field
+// expect: invalid
+// error-code: E_MISSING_FIELD
+// covers: required field omission in record value
+
+@type PostgresConfig {
+  host:    string
+  port:    number
+  db_name: string
+  tls:     bool
+}
+
+@type SqlSource = union {
+  postgres: PostgresConfig
+}
+
+@type DbSource = union {
+  sql: SqlSource
+}
+
+@type DataSource = union {
+  db: DbSource
+}
+
+@panel missing-field {
+  @dp { controller: "TestCo", record: "TEST-003" }
+  @access { purpose: "testing", operation: "read" }
+  db = read-data {
+    source: db.sql.postgres {
+      host: "localhost"
+      // port, db_name, tls are required but missing — MUST fail with E_MISSING_FIELD
+    }
+    mode: "scan"
+  }
+}

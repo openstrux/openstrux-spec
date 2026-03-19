@@ -1,0 +1,9 @@
+// fixture: v001-record-basic
+// expect: valid
+// covers: record declaration, primitive field types
+
+@type PersonalData {
+  full_name:   string
+  email:       string
+  age:         number
+}

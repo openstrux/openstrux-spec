@@ -78,7 +78,7 @@
 
 // --- Supporting types ---
 
-@strux ReadMode = enum {
+@type ReadMode = enum {
   scan                                          // full table/collection scan
   lookup                                        // single key lookup
   multi_lookup                                  // batch of key lookups
@@ -86,7 +86,7 @@
   stream                                        // continuous stream read
 }
 
-@strux ReadMetadata {
+@type ReadMetadata {
   source_path:    string                        // resolved type path (e.g., "db.sql.postgres")
   row_count:      Optional<number>              // total rows returned (if bounded)
   schema_fields:  Batch<string>                 // field names discovered from source
@@ -105,6 +105,6 @@
 //   5. Emit metadata (timing, schema, count)
 //
 // Fail-closed: no AccessContext = deny. Scope narrowing enforced.
-// Design rationale: see 04-design-notes.md.
-// Full panel examples: see 08-expression-shorthand.md.
+// Design rationale: see design-notes.md.
+// Full panel examples: see expression-shorthand.md.
 // ============================================================================

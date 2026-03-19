@@ -1,0 +1,10 @@
+// fixture: i001-unknown-type
+// expect: invalid
+// error-code: E_UNKNOWN_TYPE
+// covers: type resolution failure
+
+@type Order {
+  id:       number
+  customer: CustomerInfo
+}
+// CustomerInfo is not declared — MUST fail with E_UNKNOWN_TYPE
