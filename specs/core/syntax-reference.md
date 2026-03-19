@@ -1,4 +1,4 @@
-# OpenStrux v0.4 — Compact Syntax Reference
+# OpenStrux v0.5 — Compact Syntax Reference
 
 Target: LLM system prompt context. Budget: ~2,500 tokens.
 
