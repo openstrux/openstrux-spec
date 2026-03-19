@@ -1,0 +1,49 @@
+// fixture: p0-domain-model
+// expect: valid
+// covers: full P0 domain model — record, enum, union, panel with rod and @access
+
+// --- Type definitions ---
+
+@type Proposal {
+  id:           string
+  title:        string
+  submitter:    string
+  description:  Optional<string>
+  submitted_at: date
+  status:       ReviewStatus
+}
+
+@type ReviewStatus = enum { draft, submitted, under_review, approved, rejected }
+
+@type PostgresConfig {
+  host:    string
+  port:    number
+  db_name: string
+  tls:     bool
+}
+
+@type SqlSource = union {
+  postgres: PostgresConfig
+}
+
+@type DataSource = union {
+  db: SqlSource
+}
+
+// --- Panels ---
+
+@panel intake-proposals {
+  @dp { controller: "NLnet Foundation", record: "GW-INTAKE-001" }
+  @access { purpose: "grant_intake", operation: "write" }
+  intake = receive {
+    trigger: http { method: "POST", path: "/proposals" }
+  }
+  validate-schema = validate {
+    schema: Proposal
+  }
+  store-proposal = write-data {
+    target: db.sql.postgres {
+      host: env("DB_HOST"), port: 5432, db_name: "grants", tls: true
+    }
+  }
+}

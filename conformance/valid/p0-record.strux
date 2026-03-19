@@ -1,0 +1,12 @@
+// fixture: p0-record
+// expect: valid
+// covers: record declaration, primitive field types, Optional container
+
+@type Proposal {
+  id:           string
+  title:        string
+  submitter:    string
+  description:  Optional<string>
+  submitted_at: date
+  updated_at:   Optional<date>
+}

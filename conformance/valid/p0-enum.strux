@@ -1,0 +1,5 @@
+// fixture: p0-enum
+// expect: valid
+// covers: enum declaration, flat variant list
+
+@type ReviewStatus = enum { draft, submitted, under_review, approved, rejected }

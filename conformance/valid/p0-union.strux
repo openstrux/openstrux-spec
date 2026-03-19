@@ -1,0 +1,29 @@
+// fixture: p0-union
+// expect: valid
+// covers: union declaration, discriminated variants, nested union types
+
+@type KafkaSource {
+  bootstrap_servers: string
+  topic:             string
+  group_id:          string
+}
+
+@type PostgresConfig {
+  host:    string
+  port:    number
+  db_name: string
+  tls:     bool
+}
+
+@type SqlSource = union {
+  postgres: PostgresConfig
+}
+
+@type StreamSource = union {
+  kafka: KafkaSource
+}
+
+@type DataSource = union {
+  stream: StreamSource
+  db:     SqlSource
+}

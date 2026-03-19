@@ -1,0 +1,4 @@
+// TODO: authored in v0-6-0-validator-config
+// fixture: adr011-cert
+// expect: valid
+// covers: ADR-011 @cert block usage, certification metadata, E_CERT_IN_CONTEXT enforcement

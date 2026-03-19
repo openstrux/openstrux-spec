@@ -1,0 +1,4 @@
+// TODO: authored in v0-6-0-validator-config
+// fixture: config-inheritance
+// expect: valid
+// covers: strux.context cascade — @dp merge, @access narrowing, @ops/@sec merge, named @source/@target resolution

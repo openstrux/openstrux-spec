@@ -1,0 +1,4 @@
+// TODO: authored in v0-6-0-validator-config
+// fixture: config-inheritance-invalid
+// expect: invalid
+// covers: invalid config inheritance cases (e.g., scope widening attempt, unknown source reference)

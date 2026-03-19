@@ -1,0 +1,11 @@
+// fixture: p0-panel-rod
+// expect: valid
+// covers: panel declaration, receive rod, @dp block, @access block
+
+@panel intake-proposals {
+  @dp { controller: "NLnet Foundation", record: "GW-INTAKE-001" }
+  @access { purpose: "grant_intake", operation: "write" }
+  intake = receive {
+    trigger: http { method: "POST", path: "/proposals" }
+  }
+}
