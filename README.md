@@ -23,3 +23,13 @@ text
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the change package process in [changes/README.md](changes/README.md).
+
+## Local setup
+
+Activate the pre-push validation hook after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This runs Level 1 spec checks (markdown lint, stub detection, change package completeness) before every push.

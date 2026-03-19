@@ -1,0 +1,225 @@
+// ============================================================================
+// OpenStrux v0.4 — DataSource Type Hierarchy
+// ============================================================================
+//
+// This file defines the complete datasource union tree. It is defined ONCE
+// and reused by any rod that needs to read or write data.
+//
+// The hierarchy:
+//
+//   DataSource
+//   ├── stream: StreamSource
+//   │   ├── kafka:    KafkaConfig
+//   │   ├── pubsub:   PubSubConfig
+//   │   └── kinesis:  KinesisConfig
+//   └── db: DbSource
+//       ├── sql: SqlSource
+//       │   ├── postgres:  PostgresConfig
+//       │   ├── mysql:     MySqlConfig
+//       │   └── bigquery:  BigQueryConfig
+//       └── nosql: NoSqlSource
+//           ├── mongodb:   MongoConfig
+//           ├── dynamodb:  DynamoConfig
+//           └── firestore: FirestoreConfig
+//
+// Design: leaf configs carry ONLY backend-specific fields.
+// Common fields (timeout, retry) belong to @ops.
+// State-of-art comparison: see 04-design-notes.md.
+// ============================================================================
+
+
+// --- Top-level union ---
+
+@strux DataSource = union {
+  stream:  StreamSource
+  db:      DbSource
+}
+
+
+// =====================
+// STREAM SOURCES
+// =====================
+
+@strux StreamSource = union {
+  kafka:    KafkaConfig
+  pubsub:   PubSubConfig
+  kinesis:  KinesisConfig
+}
+
+@strux KafkaConfig {
+  brokers:        Batch<string>                 // e.g., ["broker1:9092", "broker2:9092"]
+  topic:          string
+  group_id:       Optional<string>              // consumer group
+  offset:         KafkaOffset                   // where to start reading
+  schema_registry: Optional<string>             // Confluent Schema Registry URL
+  auth:           Optional<KafkaAuth>
+}
+
+@strux KafkaOffset = enum { earliest, latest, committed }
+
+@strux KafkaAuth = union {
+  sasl:     KafkaSaslAuth
+  mtls:     KafkaMtlsAuth
+}
+
+@strux KafkaSaslAuth {
+  mechanism:  string                            // PLAIN, SCRAM-SHA-256, etc.
+  username:   string
+  password:   string                            @sec:enc("required")
+}
+
+@strux KafkaMtlsAuth {
+  cert_path:  string
+  key_path:   string
+  ca_path:    string
+}
+
+@strux PubSubConfig {
+  project:        string                        // GCP project ID
+  subscription:   Optional<string>              // read from subscription
+  topic:          Optional<string>              // or read from topic (creates temp sub)
+}
+
+@strux KinesisConfig {
+  stream_name:    string
+  region:         string                        // AWS region
+  start_position: KinesisStart
+}
+
+@strux KinesisStart = enum { trim_horizon, latest, at_timestamp }
+
+
+// =====================
+// DATABASE SOURCES
+// =====================
+
+@strux DbSource = union {
+  sql:    SqlSource
+  nosql:  NoSqlSource
+}
+
+
+// --- SQL ---
+
+@strux SqlSource = union {
+  postgres:   PostgresConfig
+  mysql:      MySqlConfig
+  bigquery:   BigQueryConfig
+}
+
+@strux PostgresConfig {
+  host:         string
+  port:         number    [1..65535]
+  db_name:      string
+  schema:       Optional<string>                // defaults to "public"
+  tls:          bool
+  ssl_mode:     Optional<PostgresSslMode>
+  pool_size:    Optional<number>  [1..100]
+  credentials:  DbCredentials                   @sec:enc("required")
+}
+
+@strux PostgresSslMode = enum { disable, allow, prefer, require, verify_ca, verify_full }
+
+@strux MySqlConfig {
+  host:         string
+  port:         number    [1..65535]
+  db_name:      string
+  tls:          bool
+  charset:      Optional<string>                // defaults to "utf8mb4"
+  credentials:  DbCredentials                   @sec:enc("required")
+}
+
+@strux BigQueryConfig {
+  project:      string
+  dataset:      string
+  location:     Optional<string>                // e.g., "EU", "US"
+  credentials:  GcpCredentials                  @sec:enc("required")
+}
+
+// Shared credential types
+
+@strux DbCredentials = union {
+  user_pass:      UserPassCredentials
+  iam:            IamCredentials
+  secret_ref:     SecretReference
+}
+
+@strux UserPassCredentials {
+  username:   string
+  password:   string                            @sec:enc("required")
+}
+
+@strux IamCredentials {
+  service_account:  Optional<string>            // if not set, uses default/ambient
+}
+
+@strux GcpCredentials = union {
+  service_account:  GcpServiceAccount
+  adc:              GcpAdc                      // Application Default Credentials
+}
+
+@strux GcpServiceAccount {
+  key_file:     string                          @sec:enc("required")
+}
+
+@strux GcpAdc {}                                // empty — uses ambient credentials
+
+@strux SecretReference {
+  provider:     SecretProvider
+  path:         string                          // e.g., "projects/my-proj/secrets/db-pass"
+}
+
+@strux SecretProvider = enum { gcp_secret_manager, aws_secrets_manager, vault, env }
+
+
+// --- NoSQL ---
+
+@strux NoSqlSource = union {
+  mongodb:    MongoConfig
+  dynamodb:   DynamoConfig
+  firestore:  FirestoreConfig
+}
+
+@strux MongoConfig {
+  connection_uri:   string                      @sec:enc("required")
+  database:         string
+  auth_source:      Optional<string>            // defaults to "admin"
+  tls:              bool
+}
+
+@strux DynamoConfig {
+  table_name:     string
+  region:         string
+  endpoint:       Optional<string>              // for local DynamoDB
+  credentials:    AwsCredentials                @sec:enc("required")
+}
+
+@strux AwsCredentials = union {
+  access_key:   AwsAccessKey
+  iam_role:     AwsIamRole
+  profile:      AwsProfile
+}
+
+@strux AwsAccessKey {
+  access_key_id:      string
+  secret_access_key:  string                    @sec:enc("required")
+}
+
+@strux AwsIamRole {
+  role_arn:     string
+}
+
+@strux AwsProfile {
+  profile_name: string
+}
+
+@strux FirestoreConfig {
+  project:      string
+  collection:   string
+  credentials:  GcpCredentials                  @sec:enc("required")
+}
+
+
+// Usage: cfg.source = db.sql.postgres { ... }
+// Type path determines: adapter, cert scope, @sec requirements.
+// Full examples: see 08-expression-shorthand.md.

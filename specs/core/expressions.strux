@@ -1,0 +1,589 @@
+// ============================================================================
+// OpenStrux v0.4 — Expression Type System
+// ============================================================================
+//
+// Expressions are strux. Not strings. Not embedded DSLs. Typed structures
+// in the same union hierarchy as everything else.
+//
+// The key insight: the expression hierarchy MIRRORS the datasource hierarchy.
+// A SqlFilterExpr can only be pushed down to a SqlSource. A MongoFilterExpr
+// can only be pushed to a MongoSource. A PortableExpr can be pushed to ANY
+// source. The compiler enforces this via type compatibility.
+//
+// This means pushdown is not a runtime optimization — it's a COMPILE-TIME
+// guarantee. If the types align, the expression is pushed. If they don't,
+// it's a type error (or falls back to in-memory execution).
+//
+// ============================================================================
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. FILTER EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Hierarchy:
+//
+//   FilterExpr
+//   ├── portable: PortableFilter       → pushable to ANY source
+//   ├── sql:      SqlFilter            → pushable to SqlSource only
+//   ├── mongo:    MongoFilter          → pushable to MongoSource only
+//   ├── kafka:    KafkaFilter          → pushable to Kafka consumer
+//   └── custom:   FunctionRef          → opaque, executes in rod (no pushdown)
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux FilterExpr = union {
+  portable:   PortableFilter
+  sql:        SqlFilter
+  mongo:      MongoFilter
+  kafka:      KafkaFilter
+  custom:     FunctionRef
+}
+
+
+// --- Portable filters (universal, adapter-translatable) ---
+
+@strux PortableFilter = union {
+  compare:    CompareFilter
+  logic:      LogicFilter
+  in_list:    InListFilter
+  between:    BetweenFilter
+  is_null:    IsNullFilter
+  like:       LikeFilter
+  exists:     ExistsFilter
+}
+
+@strux CompareFilter {
+  field:      FieldRef
+  op:         CompareOp
+  value:      Literal
+}
+
+@strux CompareOp = enum { eq, neq, gt, gte, lt, lte }
+
+@strux LogicFilter {
+  op:         LogicOp
+  operands:   Batch<PortableFilter>
+}
+
+@strux LogicOp = enum { and, or, not }
+
+@strux InListFilter {
+  field:      FieldRef
+  values:     Batch<Literal>
+  negate:     bool                    // NOT IN
+}
+
+@strux BetweenFilter {
+  field:      FieldRef
+  low:        Literal
+  high:       Literal
+}
+
+@strux IsNullFilter {
+  field:      FieldRef
+  negate:     bool                    // IS NOT NULL
+}
+
+@strux LikeFilter {
+  field:      FieldRef
+  pattern:    string                  // "John%" → starts with John
+  negate:     bool
+}
+
+@strux ExistsFilter {
+  field:      FieldRef                // check nested field/array exists
+}
+
+
+// --- SQL-specific filters (pushable to SqlSource only) ---
+
+@strux SqlFilter = union {
+  portable:   PortableFilter          // SQL can handle all portable filters
+  raw:        SqlRaw                  // raw WHERE clause
+  subquery:   SqlSubquery             // IN (SELECT ...), EXISTS (SELECT ...)
+  having:     SqlHaving               // post-aggregation filter
+}
+
+@strux SqlRaw {
+  clause:     string                  // "age > 18 AND created_at > NOW() - INTERVAL '30 days'"
+  params:     Optional<Batch<Literal>>  // parameterized: "age > $1 AND country = $2"
+}
+
+@strux SqlSubquery {
+  op:         SqlSubqueryOp
+  query:      string
+  params:     Optional<Batch<Literal>>
+}
+
+@strux SqlSubqueryOp = enum { in_subquery, exists_subquery, not_in, not_exists }
+
+@strux SqlHaving {
+  condition:  string                  // "COUNT(*) > 10"
+}
+
+
+// --- Mongo-specific filters (pushable to MongoSource only) ---
+
+@strux MongoFilter = union {
+  portable:   PortableFilter          // Mongo can handle all portable
+  match:      MongoMatch              // $match pipeline stage
+  text:       MongoTextSearch         // $text search
+  geo:        MongoGeoFilter          // $near, $geoWithin
+}
+
+@strux MongoMatch {
+  document:   string                  // JSON: {"age": {"$gt": 18}, "status": "active"}
+}
+
+@strux MongoTextSearch {
+  query:      string
+  language:   Optional<string>
+}
+
+@strux MongoGeoFilter {
+  field:      FieldRef
+  op:         MongoGeoOp
+  geometry:   string                  // GeoJSON
+  max_distance: Optional<number>
+}
+
+@strux MongoGeoOp = enum { near, geo_within, geo_intersects }
+
+
+// --- Kafka-specific filters (pushable to Kafka consumer) ---
+
+@strux KafkaFilter = union {
+  portable:   PortableFilter
+  header:     KafkaHeaderFilter       // filter by message header
+  partition:  KafkaPartitionFilter    // specific partitions only
+}
+
+@strux KafkaHeaderFilter {
+  header_key: string
+  op:         CompareOp
+  value:      string
+}
+
+@strux KafkaPartitionFilter {
+  partitions: Batch<number>
+}
+
+
+// --- Shared building blocks ---
+
+@strux FieldRef {
+  path:       Batch<string>           // ["address", "country"] → address.country
+}
+
+@strux Literal = union {
+  string_val:   LitString
+  number_val:   LitNumber
+  bool_val:     LitBool
+  date_val:     LitDate
+  null_val:     LitNull
+  env_val:      LitEnv                // runtime env variable
+}
+
+@strux LitString  { value: string }
+@strux LitNumber  { value: number }
+@strux LitBool    { value: bool }
+@strux LitDate    { value: date }
+@strux LitNull    {}
+@strux LitEnv     { var: string }     // env("COUNTRY_CODE")
+
+@strux FunctionRef {
+  module:     string                  // "rods/my-filter/core"
+  function:   string                  // "apply_business_rule"
+  version:    Optional<string>
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. PROJECTION EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//   ProjectionExpr
+//   ├── portable: PortableProjection   → pushable to ANY source
+//   ├── sql:      SqlProjection        → pushable to SqlSource
+//   ├── mongo:    MongoProjection      → pushable to MongoSource
+//   └── custom:   FunctionRef          → opaque
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux ProjectionExpr = union {
+  portable:   PortableProjection
+  sql:        SqlProjection
+  mongo:      MongoProjection
+  custom:     FunctionRef
+}
+
+@strux PortableProjection = union {
+  fields:     FieldSelection          // select specific fields
+  rename:     FieldRename             // rename fields
+  computed:   ComputedField           // add computed field
+}
+
+@strux FieldSelection {
+  include:    Optional<Batch<FieldRef>>   // whitelist (if set, only these)
+  exclude:    Optional<Batch<FieldRef>>   // blacklist (if set, all except these)
+}
+
+@strux FieldRename {
+  from:       FieldRef
+  to:         string
+}
+
+@strux ComputedField {
+  name:       string
+  expr:       PortableScalarExpr
+}
+
+@strux PortableScalarExpr = union {
+  field:      FieldRef
+  literal:    Literal
+  arithmetic: ArithmeticExpr
+  concat:     ConcatExpr
+  coalesce:   CoalesceExpr
+  case_when:  CaseWhenExpr
+}
+
+@strux ArithmeticExpr {
+  left:       PortableScalarExpr
+  op:         ArithmeticOp
+  right:      PortableScalarExpr
+}
+
+@strux ArithmeticOp = enum { add, sub, mul, div, mod }
+
+@strux ConcatExpr {
+  parts:      Batch<PortableScalarExpr>
+  separator:  Optional<string>
+}
+
+@strux CoalesceExpr {
+  candidates: Batch<PortableScalarExpr>
+}
+
+@strux CaseWhenExpr {
+  branches:   Batch<CaseWhenBranch>
+  default:    Optional<PortableScalarExpr>
+}
+
+@strux CaseWhenBranch {
+  when:       PortableFilter
+  then:       PortableScalarExpr
+}
+
+@strux SqlProjection = union {
+  portable:   PortableProjection
+  raw:        SqlSelectRaw
+  window_fn:  SqlWindowFunction
+}
+
+@strux SqlSelectRaw {
+  expressions: Batch<string>          // "EXTRACT(YEAR FROM created_at) AS year"
+}
+
+@strux SqlWindowFunction {
+  function:   string                  // "ROW_NUMBER()", "RANK()"
+  partition:  Batch<FieldRef>
+  order:      Batch<OrderField>
+  alias:      string
+}
+
+@strux MongoProjection = union {
+  portable:   PortableProjection
+  pipeline:   MongoPipelineStage      // $project, $addFields
+}
+
+@strux MongoPipelineStage {
+  stage:      string                  // JSON pipeline stage document
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. AGGREGATION EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//   AggregationExpr
+//   ├── portable: PortableAgg          → pushable to ANY source
+//   ├── sql:      SqlAgg              → pushable to SqlSource
+//   ├── mongo:    MongoAgg            → pushable to MongoSource
+//   └── custom:   FunctionRef          → opaque
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux AggregationExpr = union {
+  portable:   PortableAgg
+  sql:        SqlAgg
+  mongo:      MongoAgg
+  custom:     FunctionRef
+}
+
+@strux PortableAgg = union {
+  builtin:    BuiltinAgg
+  multi:      MultiAgg                // multiple aggregations at once
+}
+
+@strux BuiltinAgg {
+  fn:         BuiltinAggFn
+  field:      Optional<FieldRef>      // None for count(*)
+  distinct:   bool                    // COUNT(DISTINCT field)
+  alias:      Optional<string>
+}
+
+@strux BuiltinAggFn = enum { count, sum, avg, min, max, first, last, collect }
+
+@strux MultiAgg {
+  aggregations: Batch<BuiltinAgg>
+}
+
+@strux SqlAgg = union {
+  portable:     PortableAgg
+  raw:          SqlAggRaw
+  array_agg:    SqlArrayAgg
+  string_agg:   SqlStringAgg
+  percentile:   SqlPercentile
+}
+
+@strux SqlAggRaw {
+  expression:   string                // "PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency)"
+  alias:        string
+}
+
+@strux SqlArrayAgg {
+  field:        FieldRef
+  order:        Optional<Batch<OrderField>>
+  alias:        string
+}
+
+@strux SqlStringAgg {
+  field:        FieldRef
+  separator:    string
+  order:        Optional<Batch<OrderField>>
+  alias:        string
+}
+
+@strux SqlPercentile {
+  field:        FieldRef
+  percentile:   number                // 0.0 .. 1.0
+  alias:        string
+}
+
+@strux MongoAgg = union {
+  portable:     PortableAgg
+  pipeline:     Batch<MongoPipelineStage>   // $group, $bucket, $facet, etc.
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. GROUP KEY EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux GroupKeyExpr = union {
+  portable:   PortableGroupKey
+  sql:        SqlGroupKey
+  mongo:      MongoGroupKey
+  custom:     FunctionRef
+}
+
+@strux PortableGroupKey = union {
+  field:      FieldRef                // group by single field
+  fields:     Batch<FieldRef>         // group by composite key
+  computed:   ComputedField           // group by expression result
+}
+
+@strux SqlGroupKey = union {
+  portable:   PortableGroupKey
+  raw:        SqlGroupByRaw
+  rollup:     SqlRollup
+  cube:       SqlCube
+}
+
+@strux SqlGroupByRaw {
+  expressions: Batch<string>          // "EXTRACT(MONTH FROM created_at)"
+}
+
+@strux SqlRollup {
+  fields:     Batch<FieldRef>
+}
+
+@strux SqlCube {
+  fields:     Batch<FieldRef>
+}
+
+@strux MongoGroupKey = union {
+  portable:   PortableGroupKey
+  expression: MongoGroupExpr
+}
+
+@strux MongoGroupExpr {
+  document:   string                  // {"$dateToString": {"format": "%Y-%m", "date": "$created_at"}}
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. ORDER / SORT EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux OrderExpr = union {
+  portable:   Batch<OrderField>
+  sql:        SqlOrderRaw
+}
+
+@strux OrderField {
+  field:      FieldRef
+  direction:  SortDirection
+  nulls:      Optional<NullsPosition>
+}
+
+@strux SortDirection = enum { asc, desc }
+@strux NullsPosition = enum { first, last }
+
+@strux SqlOrderRaw {
+  clause:     string                  // "created_at DESC NULLS LAST, id ASC"
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. JOIN EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux JoinExpr = union {
+  portable:   PortableJoinExpr
+  sql:        SqlJoinExpr
+  custom:     FunctionRef
+}
+
+@strux PortableJoinExpr = union {
+  key_match:  KeyMatchJoin            // left.field = right.field
+  composite:  CompositeKeyJoin        // multiple field pairs
+}
+
+@strux KeyMatchJoin {
+  left_key:   FieldRef
+  right_key:  FieldRef
+}
+
+@strux CompositeKeyJoin {
+  pairs:      Batch<KeyMatchJoin>
+}
+
+@strux SqlJoinExpr = union {
+  portable:   PortableJoinExpr
+  on:         SqlJoinOn               // arbitrary ON clause
+  using:      SqlJoinUsing            // USING (field1, field2)
+  lateral:    SqlLateralJoin          // LATERAL join
+}
+
+@strux SqlJoinOn {
+  condition:  string                  // "a.id = b.user_id AND a.tenant = b.tenant"
+}
+
+@strux SqlJoinUsing {
+  fields:     Batch<string>
+}
+
+@strux SqlLateralJoin {
+  subquery:   string
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. SPLIT / ROUTE EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux RouteExpr {
+  name:       string                  // output knot name
+  condition:  FilterExpr              // reuses the full filter hierarchy
+}
+
+// split uses Batch<RouteExpr> — each route is a named filter.
+// Elements matching no route go to err.unmatched.
+// An element can match at most one route (evaluated in order, first match wins).
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. GUARD / POLICY EXPRESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Guard expressions operate on AccessContext + data, not just data.
+// They can reference principal.roles, intent.purpose, scope.*, etc.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+@strux PolicyExpr = union {
+  portable:   PortablePolicyExpr
+  opa:        OpaPolicy
+  cedar:      CedarPolicy
+  custom:     FunctionRef
+}
+
+@strux PortablePolicyExpr = union {
+  role_check:       RoleCheck
+  scope_check:      ScopeCheck
+  data_condition:   DataCondition
+  composite:        CompositePolicyExpr
+}
+
+@strux RoleCheck {
+  required_roles:   Batch<string>     // principal must have ALL of these
+  any_of:           bool              // if true, principal needs ANY one
+}
+
+@strux ScopeCheck {
+  required_scope:   Batch<string>     // scope must include these resources
+}
+
+@strux DataCondition {
+  // combine data fields with access context
+  // e.g., "element.owner_id == principal.id" (user can only see own data)
+  left:             ContextRef
+  op:               CompareOp
+  right:            ContextRef
+}
+
+@strux ContextRef = union {
+  principal_field:  PrincipalFieldRef   // principal.id, principal.roles, etc.
+  intent_field:     IntentFieldRef      // intent.purpose, intent.operation, etc.
+  data_field:       FieldRef            // element.owner_id, element.country, etc.
+  literal:          Literal
+}
+
+@strux PrincipalFieldRef {
+  field:    string                    // "id", "roles", "groups", "attrs.department"
+}
+
+@strux IntentFieldRef {
+  field:    string                    // "purpose", "operation", "basis"
+}
+
+@strux CompositePolicyExpr {
+  op:       LogicOp
+  policies: Batch<PortablePolicyExpr>
+}
+
+@strux OpaPolicy {
+  endpoint:   string                  // OPA server URL
+  policy_path: string                 // "data.authz.allow"
+  input_mapping: Map<string, ContextRef>  // map context to OPA input
+}
+
+@strux CedarPolicy {
+  policy_store: string                // Cedar policy store reference
+  action:       string
+  resource:     string
+}
+
+
+// ============================================================================
+// Pushdown and fusion rules: see 08-expression-shorthand.md sections 9.2-9.4.
+//
+// Summary:
+//   - Portable → pushable to ANY source
+//   - Source-specific (sql:, mongo:, kafka:) → pushable to matching source only
+//   - FunctionRef → no pushdown (in-memory)
+//   - Type mismatch → compile error
+//   - Sequential pushable rods → fused into single adapter call
+// ============================================================================

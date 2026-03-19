@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  openstrux-spec - normative language specification for Openstrux v0.4.
+
+  This repo defines the language. The implementation is in ../openstrux-core.
+  The manifesto and benchmark policy are in ../openstrux.
+
+  **Folder layout:**
+  - specs/core/             Core language spec: type-system, grammar, semantics, IR, locks,
+                            access-context, expressions, expression-shorthand, syntax-reference,
+                            config-inheritance, panel-shorthand, design-notes
+  - specs/modules/          Module specs: datasource-hierarchy, rods/ (overview + per-rod)
+  - specs/profiles/         Deployment profiles (mvp, future)
+  - conformance/valid/      Fixtures that MUST parse and typecheck
+  - conformance/invalid/    Fixtures that MUST fail with diagnostics
+  - conformance/golden/     Fixtures with expected generated output
+  - adr/                    Architecture Decision Records
+  - reviews/                Manifesto review scorecards per version
+  - changes/                Spec change packages (use openspec workflow below)
+  - openspec/               This workflow layer (planning for spec changes)
+
+  NOTE: openspec/specs/ tracks planning-level feature specs.
+  The actual normative spec content lives in specs/ at the repo root.
+  When a change is complete, merge spec-delta into specs/ — not into openspec/specs/.
+
+  **Current spec version:** v0.4-draft
+  **Manifesto review:** reviews/v0.4-draft.md (overall: WARN — benchmark suite pending)
+
+  **Key files:**
+  - specs/core/syntax-reference.md    Compact LLM reference (~2,000 tokens)
+  - specs/core/type-system.md         Union/record/enum, type paths, adapters
+  - specs/modules/rods/overview.md    18 basic rod taxonomy
+  - changes/README.md                 Change package format and rules
+
+  **File conventions:**
+  - Strux definitions: .strux extension
+  - Prose spec docs: .md
+  - Conformance fixtures: .strux in conformance/valid|invalid|golden/

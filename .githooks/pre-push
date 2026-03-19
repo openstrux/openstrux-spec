@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# pre-push hook — Level 1 spec validation
+# Install: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+PASS=0
+FAIL=0
+
+ok()   { echo "  ✓ $*"; }
+fail() { echo "  ✗ $*" >&2; FAIL=$((FAIL + 1)); }
+
+echo "── Spec Level 1 validation ──────────────────────────────────────────"
+
+# 1. Markdown lint
+if command -v markdownlint &>/dev/null; then
+  if markdownlint "specs/**/*.md" "changes/**/*.md" --quiet 2>/dev/null; then
+    ok "Markdown lint"
+  else
+    fail "Markdown lint — run: markdownlint specs/ changes/"
+  fi
+else
+  echo "  ⚠  markdownlint not installed — skipping (npm install -g markdownlint-cli)"
+fi
+
+# 2. Stub sections — hard fail
+STUBS=$(grep -rl "Status: stub" specs/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$STUBS" -eq 0 ]; then
+  ok "No stub sections in specs/"
+else
+  fail "$STUBS file(s) still marked 'Status: stub' in specs/ — resolve before pushing"
+  grep -rl "Status: stub" specs/ | sed 's/^/      /'
+fi
+
+# 3. Change package completeness
+if [ -d changes ]; then
+  for pkg in changes/[0-9]*/; do
+    [ -d "$pkg" ] || continue
+    missing=""
+    for f in proposal.md design.md tasks.md acceptance.md; do
+      [ -f "$pkg$f" ] || missing="$missing $f"
+    done
+    if [ -n "$missing" ]; then
+      fail "Incomplete change package $pkg — missing:$missing"
+    else
+      ok "Change package $pkg"
+    fi
+  done
+fi
+
+# 4. Benchmark fixture coverage
+# Reads benchmark case IDs (B001, B002, ...) from conformance/ filenames
+# Checks that each has at least one fixture in conformance/valid/ or conformance/invalid/
+if [ -d conformance ]; then
+  FIXTURE_COUNT=$(find conformance/valid conformance/invalid -name "*.strux" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$FIXTURE_COUNT" -gt 0 ]; then
+    ok "$FIXTURE_COUNT conformance fixture(s) present"
+  else
+    fail "No conformance fixtures found in conformance/valid/ or conformance/invalid/"
+  fi
+fi
+
+echo "─────────────────────────────────────────────────────────────────────"
+if [ "$FAIL" -gt 0 ]; then
+  echo "  FAILED — $FAIL check(s) did not pass. Push blocked."
+  exit 1
+else
+  echo "  OK — all Level 1 checks passed."
+fi

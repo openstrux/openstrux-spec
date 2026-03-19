@@ -1,0 +1,110 @@
+// ============================================================================
+// OpenStrux v0.4 — read-data Rod (Basic Rod Type)
+// ============================================================================
+//
+// read-data is the BASIC ROD for all data retrieval. It replaces v0.3's
+// read-db by generalizing to any DataSource (streams included).
+//
+// The rod's contract:
+//   1. Receive AccessContext (implicit — always available)
+//   2. Evaluate authorization: can this principal, with this intent, access
+//      this datasource with this scope?
+//   3. If authorized → delegate to the adapter resolved from cfg.source
+//   4. If denied → emit to err.unauthorized
+//   5. Data flows out through out.rows (or out.elements for streams)
+//
+// This is ONE rod definition. The adapter does the actual I/O.
+// The rod handles: access control, field masking, audit logging, error routing.
+// ============================================================================
+
+
+@rod read-data {
+  @meta {
+    description:  "Universal data read rod with built-in access control"
+    category:     "source"
+    since:        "0.4.0"
+  }
+
+  @knots {
+    // --- Configuration (cert-scoped) ---
+    cfg:  source      DataSource                // the full union — narrows at panel time
+    cfg:  mode        ReadMode
+
+    // --- Arguments (not cert-scoped) ---
+    arg:  query       Optional<string>          // SQL query, Mongo filter, etc.
+    arg:  table       Optional<string>          // table/collection name (alt to query)
+    arg:  fields      Optional<Batch<string>>   // field projection (select subset)
+    arg:  limit       Optional<number>          // max rows/elements to return
+    arg:  batch_size  Optional<number>  [1..10000]  // for pagination
+
+    // --- Runtime input ---
+    in:   key         Single<string>            @when(cfg.mode = "lookup")
+    in:   keys        Stream<string>            @when(cfg.mode = "multi_lookup")
+
+    // --- Runtime output ---
+    out:  rows        Stream<T>                 @when(cfg.source:db)
+    out:  elements    Stream<T>                 @when(cfg.source:stream)
+    out:  metadata    Single<ReadMetadata>      // row count, schema info, timing
+
+    // --- Errors ---
+    err:  unauthorized  ErrorKnot               // access denied
+    err:  failure       ErrorKnot               // adapter/connection error
+    err:  invalid       ErrorKnot               // malformed data from source
+  }
+
+  @dp {
+    op:           "source"
+    purpose:      "data_retrieval"
+    reads:        ["*"]                         // reads from external datasource
+    emits:        ["*"]                         // emits all fields (unless field_mask applied)
+    retention:    "inherit"                     // inherits from downstream rod
+  }
+
+  @cert {
+    tested: {
+      scope: [
+        { source: "db.sql.postgres",   mode: "scan" },
+        { source: "db.sql.postgres",   mode: "lookup" },
+        { source: "db.sql.mysql",      mode: "scan" },
+        { source: "db.nosql.mongodb",  mode: "scan" },
+        { source: "stream.kafka",      mode: "stream" }
+      ],
+      hash: "sha256:...",
+      ts:   "2026-03-18"
+    }
+  }
+}
+
+
+// --- Supporting types ---
+
+@strux ReadMode = enum {
+  scan                                          // full table/collection scan
+  lookup                                        // single key lookup
+  multi_lookup                                  // batch of key lookups
+  query                                         // custom query (SQL, filter doc, etc.)
+  stream                                        // continuous stream read
+}
+
+@strux ReadMetadata {
+  source_path:    string                        // resolved type path (e.g., "db.sql.postgres")
+  row_count:      Optional<number>              // total rows returned (if bounded)
+  schema_fields:  Batch<string>                 // field names discovered from source
+  started_at:     date
+  completed_at:   Optional<date>
+  adapter_version: string                       // which adapter version was used
+}
+
+
+// ============================================================================
+// Core logic contract:
+//   1. Authorize (evaluate AccessContext against cfg.source + arg)
+//   2. Apply scope constraints (intersect fields/limit with scope)
+//   3. Resolve adapter from type path (db.sql.postgres → PostgresAdapter)
+//   4. Execute via adapter
+//   5. Emit metadata (timing, schema, count)
+//
+// Fail-closed: no AccessContext = deny. Scope narrowing enforced.
+// Design rationale: see 04-design-notes.md.
+// Full panel examples: see 08-expression-shorthand.md.
+// ============================================================================

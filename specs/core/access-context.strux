@@ -1,0 +1,128 @@
+// ============================================================================
+// OpenStrux v0.4 — Access Context
+// ============================================================================
+//
+// AccessContext is an IMPLICIT knot available to every rod.
+// It carries: who is requesting (Principal), why (Intent), and what they
+// can access (Scope). Rods evaluate this BEFORE delegating to adapters.
+//
+// Fail-closed: empty context = deny. Scope narrows downstream, never widens.
+// Design rationale: see 04-design-notes.md.
+// ============================================================================
+
+
+// --- Principal: WHO is requesting ---
+
+@strux Principal {
+  id:           string                          // unique identifier (user ID, service account)
+  kind:         PrincipalKind                   // human, service, system
+  roles:        Batch<string>                   // assigned roles (e.g., "data-analyst", "admin")
+  groups:       Batch<string>                   // group memberships
+  attrs:        Map<string, string>             // extensible attributes (department, location, etc.)
+  auth_method:  AuthMethod                      // how they authenticated
+  session_id:   Optional<string>                // session tracking (for audit trail)
+}
+
+@strux PrincipalKind = enum { human, service, system }
+
+@strux AuthMethod = enum { oauth2, api_key, mtls, service_account, anonymous }
+
+
+// --- Intent: WHY are they requesting ---
+
+@strux Intent {
+  purpose:      string                          // declared processing purpose
+  basis:        DpBasis                         // legal basis (from @dp vocabulary)
+  operation:    IntentOp                        // what kind of operation
+  urgency:      Urgency                         // for SLA / priority routing
+  trace_id:     Optional<string>                // distributed tracing correlation
+  metadata:     Map<string, string>             // extensible (e.g., ticket ID, experiment ID)
+}
+
+@strux DpBasis = enum {
+  consent
+  contract
+  legitimate_interest
+  legal_obligation
+  vital_interest
+  public_task
+}
+
+@strux IntentOp = enum {
+  read                                          // retrieve data
+  write                                         // create or update data
+  delete                                        // remove data
+  transform                                     // process/modify in pipeline
+  export                                        // send outside system boundary
+  audit                                         // compliance/monitoring read
+}
+
+@strux Urgency = enum { routine, priority, critical }
+
+
+// --- Scope: WHAT can they access ---
+
+@strux Scope {
+  resources:    Batch<ResourceGrant>            // explicit resource grants
+  field_mask:   Optional<Batch<string>>         // field-level restriction (e.g., ["full_name", "email"])
+  row_filter:   Optional<string>               // row-level predicate (e.g., "country = 'ES'")
+  max_rows:     Optional<number>               // cardinality limit
+  time_window:  Optional<TimeWindow>           // temporal restriction
+  deny:         Batch<string>                   // explicit denials (override grants)
+}
+
+@strux ResourceGrant {
+  resource:     string                          // resource path (e.g., "db.users", "stream.events")
+  actions:      Batch<IntentOp>                 // allowed operations
+  conditions:   Map<string, string>             // conditional access (e.g., "env": "production")
+}
+
+@strux TimeWindow {
+  from:         Optional<date>
+  to:           Optional<date>
+}
+
+
+// --- AccessContext: the full package ---
+
+@strux AccessContext {
+  principal:    Principal                       // WHO
+  intent:       Intent                          // WHY
+  scope:        Scope                           // WHAT (derived from policy evaluation)
+  ts:           date                            // WHEN (request timestamp)
+  evaluated:    bool                            // has policy been evaluated?
+  policy_ref:   Optional<string>               // reference to policy that granted access
+}
+
+
+// ============================================================================
+// Flow rules:
+//   - Implicit on every rod (no snap wiring needed)
+//   - Panel sets via @access block
+//   - Propagates downstream; scope narrows, never widens (compile-time enforced)
+//   - Empty context = deny (fail-closed)
+// ============================================================================
+
+
+// --- Authorization Result (returned by policy evaluation) ---
+
+@strux AuthzResult = union {
+  allow:    AuthzAllow
+  deny:     AuthzDeny
+}
+
+@strux AuthzAllow {
+  scope:        Scope                           // granted scope
+  policy_ref:   string                          // which policy granted it
+  expires:      Optional<date>                  // time-bound grant
+}
+
+@strux AuthzDeny {
+  reason:       string                          // human-readable
+  code:         string                          // machine-readable (e.g., "INSUFFICIENT_ROLE")
+  policy_ref:   Optional<string>               // which policy denied it
+}
+
+
+// Policies referenced by name: policy("name"). Defined externally (hub, OPA, Cedar).
+// See 04-design-notes.md for rationale on separation.
