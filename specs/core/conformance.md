@@ -11,6 +11,12 @@ classes:
 | **Validator** | AST → validated IR | Type checking, scope verification, snap graph validation, pushdown compatibility |
 | **Emitter** | IR → target code | At least one emission target, deterministic output |
 
+<!-- GAP v0.6.0.alpha: Add a **Manifest** conformance class covering
+     compiled manifest output (mf.strux.json). Per ADR-013, the manifest
+     MUST include structured explanation metadata under a schema-defined
+     audit field. This class should verify audit field presence, source
+     location traceability, and pushdown/policy summary correctness. -->
+
 An implementation MAY claim conformance to one or more classes
 independently. A full toolchain (parser + validator + emitter) claims
 **full conformance**.
@@ -87,6 +93,13 @@ platform-specific line endings).
      Will be specified when the first emission target (Beam Python)
      reaches implementation. -->
 
+<!-- GAP v0.6.0.alpha: Add golden fixtures for compiled manifests
+     (conformance/golden/*.mf.strux.json). These MUST verify that the
+     audit/explanation metadata required by ADR-013 is present and
+     structurally correct. Also add valid fixtures for panels that
+     produce explanation output, and invalid fixtures for manifests
+     missing required audit fields. -->
+
 ## Diagnostic Format
 
 Diagnostics produced by a conformant implementation MUST include:
@@ -156,6 +169,13 @@ A Level 3 implementation additionally:
   output)
 - MUST match golden fixtures for supported targets
 - MUST consume `snap.lock` for reproducible builds
+
+<!-- GAP v0.6.0.alpha: Level 3 should additionally require:
+     - MUST produce a compiled manifest (mf.strux.json) with structured
+       explanation/audit metadata (ADR-013)
+     - MUST include source locations (loc fields, per ADR-006) in the
+       audit metadata for every IR node
+     - Golden manifest fixtures MUST match for supported targets -->
 
 ## How to Report Non-Conformance
 
