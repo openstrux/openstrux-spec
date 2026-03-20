@@ -2,6 +2,7 @@
 
 - **Status:** Open
 - **Date:** 2026-03-19
+- **Updated:** 2026-03-20
 - **Context:** The manifesto requires token compression ratio <= 0.25
   (P1 SHOULD-1) and "source is compact, compiled is complete" is a
   foundational design principle. Config inheritance (spec:
@@ -100,6 +101,22 @@ The optimized split is:
 - The pattern is RECOMMENDED, not REQUIRED — simple single-file
   projects may skip the cascade without violating the spec.
 
+## Open Questions
+
+### Module system (→ ADR-017)
+
+ADR-016 defines how *config* is shared across files (context cascade).
+It does not define how *definitions* — types, panels, functions — are
+shared. A codebase with multiple `.strux` files currently relies on
+implicit project-wide scope: every `@type` defined anywhere is visible
+everywhere. This works for small projects but creates ambiguity and
+name collisions at scale.
+
+ADR-017 addresses the missing module system: explicit imports,
+namespacing, visibility, and hub package references. Together, ADR-016
+(config sharing) and ADR-017 (definition sharing) form the complete
+multi-file story.
+
 ## Validation
 
 This ADR is **Open** pending empirical validation. The grant-workflow
@@ -116,6 +133,8 @@ this ADR moves to Accepted or Revised.
 
 - `specs/core/config-inheritance.md` — context cascade semantics
 - `specs/core/panel-shorthand.md` — shorthand syntax and token impact
+- `specs/core/syntax-reference.md` — compact LLM entry point (includes context inheritance summary)
 - ADR-007: Implicit Linear Chain
 - ADR-011: Certification Scope Not Inherited
+- ADR-017: Module and Package System
 - `docs/manifesto/MANIFESTO_OBJECTIVES.md` — P1 SHOULD-1 (token ratio)
