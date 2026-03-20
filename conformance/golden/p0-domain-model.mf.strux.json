@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "0.6",
+  "version": "0.6.0",
+  "contentHash": "95a213cbc1680ef7a6e989db3440129411b0af2002a76ed7a3c90c8da9b4f351",
+  "certificationScope": [
+    "DataSource",
+    "PostgresConfig",
+    "Proposal",
+    "ReviewStatus",
+    "SqlSource",
+    "db.sql.postgres",
+    "http"
+  ],
+  "timestamp": "__TIMESTAMP__",
+  "lockRef": "__LOCK_REF__",
+  "audit": {
+    "entries": [
+      {
+        "step": 1,
+        "rod": "receive",
+        "description": "receive rod: intake",
+        "loc": {
+          "file": "p0-domain-model.strux",
+          "line": 38,
+          "col": 3
+        }
+      },
+      {
+        "step": 2,
+        "rod": "validate",
+        "description": "validate rod: validate-schema",
+        "loc": {
+          "file": "p0-domain-model.strux",
+          "line": 41,
+          "col": 3
+        }
+      },
+      {
+        "step": 3,
+        "rod": "write-data",
+        "description": "write-data rod: store-proposal",
+        "loc": {
+          "file": "p0-domain-model.strux",
+          "line": 44,
+          "col": 3
+        }
+      }
+    ],
+    "accessContext": {
+      "intent": "grant_intake (write, basis=contract)"
+    },
+    "policyVerification": {
+      "inlineCount": 0,
+      "hubCount": 0,
+      "externalCount": 0,
+      "opaqueWarnings": 0
+    }
+  }
+}
