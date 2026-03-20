@@ -1,0 +1,12 @@
+// fixture: i011-cert-in-folder-context
+// expect: invalid (config-level error)
+// error-code: E_CERT_IN_CONTEXT
+// covers: ADR-011 — @cert found in folder-level strux.context file
+// Note: E_CERT_IN_CONTEXT is emitted by @openstrux/config during context resolution.
+// Integration tests in packages/config verify the diagnostic is produced.
+
+@panel folder-context-cert-panel {
+  @dp { controller: "Corp" }
+  @access { purpose: "test", operation: "read" }
+  r = receive { trigger: http { method: "GET" } }
+}

@@ -1,18 +1,11 @@
 # Openstrux 0.6.0 — Syntax Reference
 
-This is the canonical entry point for the Strux language. It is designed to be
-self-sufficient: an LLM should be able to generate valid `.strux` source from
-this document alone, without loading the full specification. Where deeper detail
-exists, a reference link is provided — load those only when the compact rules
-here are insufficient.
+Self-sufficient entry point — generate valid `.strux` from this document alone.
+Deeper spec links provided; load only when compact rules here are insufficient.
 
-Openstrux is an AI-native language. Express systems as typed graphs (panels of
-rods); generate executable code from source. Design goals: token-efficient
-(small vocabulary, short keywords, minimal boilerplate), certified by design
-(typed interfaces, version + content hash, explicit certification scope),
-human-translatable on demand (deterministic builds, generated readable output),
-structure-first (source is the canonical artifact, code is a derived view), and
-trust built in (audit and lineage from source, not bolted on afterward).
+Openstrux: AI-native language. Systems as typed graphs (panels of rods);
+generate executable code from source. Goals: token-efficient, certified by
+design, human-translatable, structure-first, trust built in.
 
 ---
 
@@ -35,7 +28,7 @@ Wildcards: `db.sql.*` (any SQL), `db.*` (any DB), `*` (any).
 
 ## Panel Structure
 
-Shorthand form (recommended for authoring):
+Shorthand (recommended for authoring):
 
 ```
 @panel name {
@@ -46,12 +39,22 @@ Shorthand form (recommended for authoring):
 }
 ```
 
-Shorthand rules (verbose form remains valid — compiler normalizes both to same AST):
+Shorthand rules (verbose remains valid — both normalize to same AST):
 
-1. `@rod` keyword and `=` separator are optional inside `@panel`.
-2. `cfg.`/`arg.` prefixes are optional — compiler resolves from rod type definition.
-3. Implicit linear chain — each rod reads the previous rod's default output (no snap needed).
+1. `@rod` keyword optional inside `@panel` — every non-decorator statement is a rod.
+   The `=` separator between name and type remains: `name = rod-type { ... }`.
+2. `cfg.`/`arg.` prefixes optional — compiler resolves from rod type definition.
+3. Implicit linear chain — each rod reads previous rod's default output (no snap needed).
 4. `@access` intent fields can be flattened (drop the `intent:` wrapper).
+
+Verbose and shorthand equivalence:
+
+```
+@rod f = filter { arg.predicate = ..., snap db.out.rows -> in.data }   // verbose
+f = filter { predicate: ..., from: db.rows }                           // shorthand explicit
+f = filter { predicate: ... }                                          // shorthand implicit chain
+src = read-data { source: @production, mode: "scan", @ops { retry: 5, fallback: @backup } }  // rod-level @ops
+```
 
 ## 18 Basic Rods
 
@@ -63,6 +66,7 @@ Shorthand rules (verbose form remains valid — compiler normalizes both to same
 | `write-data` | target: DataTarget | — | rows/elements | receipt, meta | failure, reject |
 
 ReadMode: `scan`, `lookup`, `multi_lookup`, `query`, `stream`.
+Table/collection selection via `arg.predicate` (e.g., `predicate: sql: SELECT * FROM users`).
 
 ### I/O — Service
 
@@ -86,7 +90,7 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 | `aggregate` | arg.fn, in.grouped→out.result |
 | `merge` | in.left+in.right→out.merged |
 | `join` | cfg.mode: inner\|left\|right\|outer\|cross\|lookup, arg.on, in.left+in.right→out.joined+out.unmatched |
-| `window` | cfg.kind: fixed\|sliding\|session, cfg.size, in.data→out.windowed |
+| `window` | cfg.kind: fixed\|sliding\|session, cfg.size: duration, in.data→out.windowed |
 
 ### Control
 
@@ -99,9 +103,11 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 
 | Rod | Key knots |
 |-----|-----------|
-| `validate` | cfg.schema, in.data→out.valid, err.invalid |
+| `validate` | cfg.schema: SchemaRef, in.data→out.valid, err.invalid |
 | `pseudonymize` | cfg.algo, arg.fields, in.data→out.masked |
 | `encrypt` | cfg.key_ref, arg.fields, in.data→out.encrypted |
+
+SchemaRef: `@type` reference or named schema from context (e.g., `schema: UserPayload`).
 
 ### Topology
 
@@ -123,7 +129,7 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 | encrypt | encrypted | data |
 | merge | merged | left (+ right) |
 | join | joined | left (+ right) |
-| split | (named routes) | data |
+| split | (named routes — no default, explicit `from:` required downstream) | data |
 | write-data | receipt | rows / elements |
 | receive | request | — (trigger) |
 | respond | sent | data |
@@ -132,16 +138,24 @@ CallMethod: `get`, `post`, `put`, `patch`, `delete`, `unary`, `server_stream`, `
 | store | result | key |
 | window | windowed | data |
 
-Ref: [panel-shorthand.md](panel-shorthand.md) for formal implicit chain rules.
+`window → group → aggregate` chains without explicit wiring (`windowed` is compatible with `group.in.data` and `aggregate.in.grouped`).
 
-## DataSource Union Tree
+## Data Union Trees
 
 ```
 DataSource = stream (kafka, pubsub, kinesis) | db (sql: postgres/mysql/bigquery, nosql: mongodb/dynamodb/firestore)
 ```
 
-Config pattern: `db.sql.postgres { host, port, db_name, tls, credentials: secret_ref{provider,path} }`.
-SecretRef providers: `gcp_secret_manager`, `aws_secrets_manager`, `vault`, `env`.
+DataTarget follows the same union tree as DataSource.
+
+Config patterns:
+
+```
+db.sql.postgres { host, port, db_name, tls, credentials: secret_ref{provider,path} }
+stream.kafka { brokers, topic, credentials }
+stream.pubsub { project, topic }
+stream.kinesis { region, stream_name, credentials }
+```
 
 ## Expression Shorthand
 
@@ -210,6 +224,8 @@ element.owner_id == principal.id                           // row-level
 opa: data.authz.allow                                      // external engine
 ```
 
+Rod shorthand: `g = guard { policy: opa: data.authz.allow }`.
+
 ## Pushdown Rules
 
 Portable expressions push to any source. Prefixed push only to matching source (`sql:` → SQL, `mongo:` → Mongo). Type mismatch = compile error. Sequential pushable rods fuse into single adapter call (logical plan preserved for audit).
@@ -224,9 +240,19 @@ Portable expressions push to any source. Prefixed push only to matching source (
 @access { intent: { purpose, basis, operation }, scope: policy("name") }
 ```
 
+`@ops` field types:
+
+```
+retry: number                                // max attempts
+timeout: duration                            // "30s", "5m"
+fallback: @name | rod-name                   // named source or rod on exhaustion
+circuit_breaker: { threshold: number, window: duration }
+rate_limit: { max: number, window: duration }
+```
+
 ## Context Inheritance
 
-Shared config lives in `strux.context` files. Panels inherit and override.
+Shared config in `strux.context` files. Panels inherit and override.
 
 ```
 project-root/
@@ -253,7 +279,7 @@ project-root/
 
 | Block | Inheritable | Merge behavior |
 |-------|------------|----------------|
-| `@dp` | Yes | Field-level merge, panel wins on conflict |
+| `@dp` | Yes | Field-level merge, panel wins |
 | `@access` | Yes | Panel can **narrow** scope, never widen (compile error) |
 | `@source` | Yes (by `@name`) | `cfg.source = @production` references named source; inline fields override |
 | `@target` | Yes (by `@name`) | Same as @source |
@@ -261,20 +287,22 @@ project-root/
 | `@sec` | Yes | Field-level merge |
 | `@cert` | **No** | Per-component only, never inherited |
 
-Ref: [config-inheritance.md](config-inheritance.md) for cascade resolution, compile-time flattening.
-
-## env() and secret_ref
+## Built-in References and Credentials
 
 ```
+@name                                       // named @source/@target from strux.context
+@name { field: override }                   // resolve + override fields inline
 env("VAR_NAME")                             // environment variable
 secret_ref { provider: vault, path: "..." } // secret reference
+policy("name")                              // named policy (hub, OPA, or Cedar); compile-time ref
+adc {}                                      // GCP Application Default Credentials (empty record)
 ```
+
+SecretRef providers: `gcp_secret_manager`, `aws_secrets_manager`, `vault`, `env`.
 
 ---
 
 ## Grammar Essentials
-
-Full EBNF: [grammar.md](grammar.md). Key rules for generation below.
 
 ### Lexical
 
@@ -284,19 +312,19 @@ string        = '"' { char | escape } '"'
 escape        = '\"' | '\\' | '\n' | '\t' | '\r'
 number        = digit { digit } [ "." digit { digit } ]
 bool          = "true" | "false"
+duration      = number ("s" | "m" | "h" | "d")               // "30s", "5m", "24h"
 comment       = "//" (everything until end of line)
 ```
 
-Whitespace (space, tab, newline) is ignored outside strings. Statements are
-line-oriented; braces delimit blocks.
+Whitespace ignored outside strings. Braces delimit blocks.
 
 ### Reserved Words
 
 Keywords — cannot be used as `name`:
 
 ```
-@type @panel @context @rod @dp @access @sec @ops @cert @source @target @when
-@adapter
+@type @panel @context @rod @dp @access @sec @ops @cert @source @target
+@when @adapter                                                           // reserved (type-system, semantics)
 union enum record
 read-data write-data receive respond call transform filter group aggregate
 merge join window guard store validate pseudonymize encrypt split
@@ -306,6 +334,10 @@ COUNT SUM AVG MIN MAX COLLECT
 true false null
 env secret_ref policy snap from
 ```
+
+Type scope notes: `StateBackend` — per adapter ([type-system.md](type-system.md)).
+`PolicyRef` — hub or policy store ([design-notes.md](design-notes.md) §5).
+`COLLECT` — reserved for future grouped collection. `CASE/WHEN/THEN/ELSE/END` — reserved for conditional expressions.
 
 ### Operator Precedence (highest to lowest)
 
@@ -322,71 +354,81 @@ env secret_ref policy snap from
 
 ### Normalization
 
-Verbose and shorthand forms produce identical AST. Specifically:
+Verbose and shorthand produce identical AST:
 
-- `@rod name = type { cfg.field = val }` and `name = type { field: val }` are equivalent.
-- Sequential rods without `from:` produce implicit snap edges using default knots.
-- Flat `@access { purpose, operation }` routes to `intent` sub-structure.
+- `@rod name = type { cfg.field = val }` ≡ `name = type { field: val }`.
+- Rods without `from:` → implicit snap edges via default knots.
+- Flat `@access { purpose, operation }` → routes to `intent` sub-structure.
 
 ---
 
 ## Semantic Essentials
 
-Full specification: [semantics.md](semantics.md). Key rules for generation below.
-
 ### Evaluation Order
 
 Rods execute in **topological order** of the snap graph (not declaration order).
-For linear chains these are equivalent. Data dependencies must be respected;
-branches from multi-output rods (filter.match/reject, split routes) MAY run in
-parallel.
+For linear chains these are equivalent. Branches from multi-output rods
+(filter.match/reject, split routes) MAY run in parallel.
 
 ### Implicit Chaining Rules
 
 1. First rod in a panel has no implicit input (it is a source).
 2. Each subsequent rod without `from:` reads the previous rod's **default output**.
 3. `from: rod.knot` overrides implicit chain (reads named output knot).
-4. `from: [rod1, rod2]` for multi-input rods (first = left, second = right).
+4. `from: [rod1, rod2]` for multi-input rods — first = left, second = right.
 5. Implicit chain follows the **default** output only (match, not reject).
    Non-default outputs require explicit `from:` on downstream rods.
 6. After normalization, all chains are explicit in the IR.
+7. Source rods (`read-data`, `receive`, `in: —`) always start a new chain
+   regardless of position — they never consume the previous rod's output.
+8. A rod with explicit `from:` does not advance the implicit chain. The next
+   rod without `from:` chains from the last implicit-chain rod, not the branch.
+
+`from: rod.knot` resolves across `out` and `err` namespaces — knot names are
+unique per rod, so the namespace prefix is dropped in shorthand.
+
+Multi-input example:
+
+```
+users = read-data { source: @production, mode: "scan" }
+orders = read-data { source: @production, mode: "scan" }
+j = join { mode: "inner", on: left.user_id == right.id, from: [users, orders] }
+//   ↑ normalizes to: snap users.out.rows -> in.left, snap orders.out.rows -> in.right
+```
 
 ### AccessContext
 
-- `@access` is evaluated implicitly for every rod — no explicit wiring needed.
+- `@access` evaluated implicitly for every rod — no explicit wiring needed.
 - Empty AccessContext → **deny** (fail-closed).
-- Scope narrows downstream, never widens.
+- Scope narrows downstream, never widens. Enforced at compile time.
 - `guard` rod is the explicit business-policy evaluation point.
-- Narrowing is enforced at compile time.
 
 ### Error Propagation
 
 1. If `err` knot is wired to a downstream rod → error data flows there.
-2. If `err` knot is unwired → check `@ops { fallback }` or `@ops { retry }`.
-3. If neither → panel fails with unhandled error. Errors are **never** silently discarded.
+2. If unwired → apply `@ops { retry }` first, then `@ops { fallback }` on exhaustion.
+3. If neither → panel fails with unhandled error. Errors **never** silently discarded.
+
+`write-data` has two error knots: `failure` (transport/system, follows cascade
+above) and `reject` (data-level, e.g. schema mismatch). `reject` is a typed
+branch, not a failure channel — wire it like any non-default output (typically DLQ).
 
 ### Determinism
 
-**Same source + same `snap.lock` + same `strux.context` = same compiled output.**
-
-This applies to compiled artifacts (manifest, emitted code), not runtime behavior
-of emitted code (which depends on external systems). Verbose and shorthand forms
-that differ only in syntax produce identical artifacts.
+**Same source + same `snap.lock` = same compiled output.** Lock captures context
+chain hashes, so `strux.context` is pinned. Applies to compiled artifacts, not
+runtime behavior. Verbose and shorthand produce identical artifacts.
 
 ### Pushdown & Fusion
 
-Portable expressions push to any source. Source-prefixed expressions push only to
-matching backends. Sequential pushable rods fuse into a single adapter call.
-`fn:` references break the fusion chain (execute in-memory). Logical plan is
-always preserved for audit regardless of physical fusion.
-
-Ref: [expression-shorthand.md](expression-shorthand.md) §9 for compiler behavior, fusion examples.
+See Pushdown Rules above. `fn:` references break the fusion chain (execute
+in-memory). Logical plan always preserved for audit regardless of physical fusion.
 
 ---
 
 ## Full Panel Example
 
-Self-contained verbose form (~336 tokens):
+Verbose form (~336 tokens):
 
 ```
 @panel user-analytics {
@@ -418,7 +460,7 @@ Self-contained verbose form (~336 tokens):
 }
 ```
 
-Same panel with context inheritance + shorthand (~142 tokens):
+With context inheritance + shorthand (~142 tokens):
 
 ```
 @panel user-analytics {
@@ -436,17 +478,16 @@ Same panel with context inheritance + shorthand (~142 tokens):
 
 ## Specification Map
 
-This reference is self-sufficient for generating valid `.strux` source.
-Load these only when deeper detail is needed:
+This reference is self-sufficient for generation. Load only when deeper detail is needed:
 
 | Document | When to load |
 |----------|-------------|
 | [grammar.md](grammar.md) | Full EBNF, all productions, edge cases |
 | [semantics.md](semantics.md) | Formal evaluation model, error rules, determinism proofs |
 | [type-system.md](type-system.md) | Union nesting, adapter registration, type narrowing details |
-| [expression-shorthand.md](expression-shorthand.md) | All expression forms with examples, compiler pushdown/fusion behavior |
+| [expression-shorthand.md](expression-shorthand.md) | All expression forms, compiler pushdown/fusion behavior |
 | [panel-shorthand.md](panel-shorthand.md) | Shorthand derivation, token budget analysis |
-| [config-inheritance.md](config-inheritance.md) | Context cascade resolution, merge/narrowing semantics, compiled output format |
+| [config-inheritance.md](config-inheritance.md) | Context cascade, merge/narrowing semantics, compiled output format |
 | [conformance.md](conformance.md) | Conformance levels, fixture format, diagnostic codes |
 | [ir.md](ir.md) | IR node structure, compiler pipeline |
 | [locks.md](locks.md) | Lock file format, reproducible build guarantees |

@@ -1,0 +1,15 @@
+// fixture: v011-panel-cert
+// expect: valid
+// covers: ADR-011 — @cert block on panel (not in context file)
+
+@type Proposal {
+  id: string
+  title: string
+}
+
+@panel certified-panel {
+  @dp { controller: "NLnet Foundation", record: "CERT-001", cert: { level: "L1", scope: { Proposal: "read" }, hash: "sha256:placeholder" } }
+  @access { purpose: "grant_read", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+  t = transform { fn: identity }
+}

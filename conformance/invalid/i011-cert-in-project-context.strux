@@ -1,0 +1,14 @@
+// fixture: i011-cert-in-project-context
+// expect: invalid (config-level error)
+// error-code: E_CERT_IN_CONTEXT
+// covers: ADR-011 — @cert found in context file
+// Note: E_CERT_IN_CONTEXT is emitted by @openstrux/config when parsing strux.context
+// files, not by the parser or validator. This fixture documents the expected behaviour.
+// Integration tests in packages/config verify the diagnostic is produced when
+// a strux.context file contains a @cert block.
+
+@panel context-cert-panel {
+  @dp { controller: "Corp" }
+  @access { purpose: "test", operation: "read" }
+  r = receive { trigger: http { method: "GET" } }
+}

@@ -1,0 +1,17 @@
+// fixture: i011-cert-scope-uncovered
+// expect: invalid (validator-level warning)
+// error-code: W_CERT_SCOPE_UNCOVERED
+// covers: ADR-011 — panel uses type path not covered by @cert scope
+// Note: W_CERT_SCOPE_UNCOVERED is emitted by @openstrux/validator when a rod uses
+// a multi-segment type path not listed in the panel's @cert.scope block.
+
+@type Proposal {
+  id: string
+}
+
+@panel cert-scope-uncovered-panel {
+  @dp { controller: "Corp", cert: { level: "L1", scope: { Proposal: "read" }, hash: "sha256:abc" } }
+  @access { purpose: "test", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+  t = transform { fn: some.external.transform }
+}

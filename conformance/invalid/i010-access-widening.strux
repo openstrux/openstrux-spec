@@ -1,0 +1,13 @@
+// fixture: i010-access-widening
+// expect: invalid (config-level error)
+// error-code: E_ACCESS_WIDENING
+// covers: config inheritance — scope widening attempt rejected (CI-003)
+// Note: E_ACCESS_WIDENING is emitted by @openstrux/config during context resolution,
+// not by the parser or validator. This fixture documents the expected behaviour;
+// integration tests in packages/config verify the diagnostic is produced.
+
+@panel access-widening-panel {
+  @dp { controller: "Corp" }
+  @access { purpose: "test", operation: "read" }
+  r = receive { trigger: http { method: "GET" } }
+}

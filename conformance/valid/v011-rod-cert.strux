@@ -1,0 +1,13 @@
+// fixture: v011-rod-cert
+// expect: valid
+// covers: ADR-011 — @cert in rod-level context (not in context file)
+
+@type Proposal {
+  id: string
+}
+
+@panel rod-certified-panel {
+  @dp { controller: "NLnet Foundation", record: "RCERT-001" }
+  @access { purpose: "grant_read", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+}

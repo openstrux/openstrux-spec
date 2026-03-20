@@ -1,0 +1,17 @@
+// fixture: i011-cert-hash-mismatch
+// expect: invalid (validator-level error when compiledHash is provided)
+// error-code: E_CERT_HASH_MISMATCH
+// covers: ADR-011 — @cert hash does not match compiled output
+// Note: E_CERT_HASH_MISMATCH requires options.compiledHash to be provided to the
+// validator. This fixture documents the expected behaviour; integration tests in
+// packages/validator verify the diagnostic is produced with a mismatched hash.
+
+@type Proposal {
+  id: string
+}
+
+@panel hash-mismatch-panel {
+  @dp { controller: "Corp", cert: { level: "L1", scope: { Proposal: "read" }, hash: "sha256:wrong-hash" } }
+  @access { purpose: "test", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+}

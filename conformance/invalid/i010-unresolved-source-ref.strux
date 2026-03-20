@@ -1,0 +1,10 @@
+// fixture: i010-unresolved-source-ref
+// expect: invalid
+// error-code: V001
+// covers: type resolution failure — unresolved type in rod knot
+
+@panel unresolved-type-panel {
+  @dp { controller: "Corp" }
+  @access { purpose: "test", operation: "read" }
+  r = validate { schema: UnknownSchemaType }
+}

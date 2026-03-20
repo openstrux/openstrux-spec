@@ -1,0 +1,19 @@
+// fixture: v010-context-dp-merge
+// expect: valid
+// covers: config inheritance — @dp field-level merge, nearest wins (CI-002)
+// Note: context files are resolved from ancestor directories at runtime.
+// This fixture validates the panel source itself is valid; the config package
+// tests verify the merge semantics directly.
+
+@type DataRecord {
+  id: string
+  name: string
+}
+
+@panel dp-merge-panel {
+  @dp { controller: "NLnet Foundation", record: "GW-MERGE-001", processor: "TechPartner" }
+  @access { purpose: "grant_review", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+  t = transform { fn: identity }
+  w = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+}

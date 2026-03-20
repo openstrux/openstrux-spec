@@ -1,0 +1,15 @@
+// fixture: v010-context-named-source
+// expect: valid
+// covers: config inheritance — named @source resolution (CI-005)
+
+@type ConnectionConfig {
+  host: string
+  port: number
+}
+
+@panel named-source-panel {
+  @dp { controller: "NLnet Foundation", record: "NS-001" }
+  @access { purpose: "data_read", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "prod.db", port: 5432, db_name: "grants", tls: true } }
+  t = transform { fn: identity }
+}

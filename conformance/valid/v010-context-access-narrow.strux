@@ -1,0 +1,15 @@
+// fixture: v010-context-access-narrow
+// expect: valid
+// covers: config inheritance — @access scope narrowing (child scope <= parent scope) (CI-003)
+
+@type User {
+  name: string
+  email: string
+}
+
+@panel narrow-access-panel {
+  @dp { controller: "Privacy Corp", record: "NARROW-001" }
+  @access { purpose: "user_read", operation: "read", scope: { resources: ["User"], actions: ["read"] } }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "users", tls: true } }
+  t = transform { fn: identity }
+}

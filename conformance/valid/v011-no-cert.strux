@@ -1,0 +1,15 @@
+// fixture: v011-no-cert
+// expect: valid
+// covers: ADR-011 — panel without @cert block (valid — cert is optional)
+
+@type Proposal {
+  id: string
+  title: string
+}
+
+@panel uncertified-panel {
+  @dp { controller: "NLnet Foundation", record: "NOCERT-001" }
+  @access { purpose: "grant_read", operation: "read" }
+  r = read-data { source: db.sql.postgres { host: "localhost", port: 5432, db_name: "grants", tls: true } }
+  t = transform { fn: identity }
+}
