@@ -1,0 +1,9 @@
+// fixture: err-unknown-rod
+// expect: invalid
+// error-code: E002
+// covers: rod type not in the 18 known rod types
+
+@panel bad-panel {
+  @access { purpose: "testing", operation: "read" }
+  r = my-nonexistent-rod { mode: "turbo" }
+}

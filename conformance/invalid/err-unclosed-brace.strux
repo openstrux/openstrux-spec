@@ -1,0 +1,12 @@
+// fixture: err-unclosed-brace
+// expect: invalid
+// error-code: E001
+// covers: missing closing brace on @panel block
+
+@panel intake-proposals {
+  @access { purpose: "grant_intake", operation: "write" }
+  intake = receive {
+    trigger: http { method: "POST", path: "/proposals" }
+  }
+
+// closing '}' of the @panel block is intentionally missing — parser MUST emit E001

@@ -1,0 +1,12 @@
+// fixture: warn-missing-access
+// expect: invalid
+// error-code: W001
+// severity: warning
+// covers: @panel block with no @access block — parser MUST emit W001 warning
+
+@panel no-access-panel {
+  @dp { controller: "TestCo", record: "TEST-999" }
+  r = receive {
+    trigger: http { method: "POST", path: "/test" }
+  }
+}

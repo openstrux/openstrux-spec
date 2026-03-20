@@ -1,0 +1,8 @@
+{
+  "diagnostics": [
+    {
+      "code": "W001",
+      "severity": "warning"
+    }
+  ]
+}

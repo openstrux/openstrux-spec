@@ -1,0 +1,12 @@
+// fixture: err-bad-type-path
+// expect: invalid
+// error-code: E003
+// covers: type path with missing segment (trailing dot)
+
+@panel bad-path {
+  @access { purpose: "testing", operation: "read" }
+  db = read-data {
+    source: db. {}
+    mode: "scan"
+  }
+}
