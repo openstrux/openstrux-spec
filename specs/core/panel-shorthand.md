@@ -200,3 +200,11 @@ explicit snaps) for audit and certification.
 7. **Implicit chain is declaration order, not topological order.** The
    panel author controls the chain by ordering rod declarations. The
    compiler validates that the resulting graph is acyclic.
+
+8. **`from:` namespace resolution.** When `from: rod.knot` is specified,
+   `rod` resolves against rod names declared in the same panel. The
+   `knot` segment resolves against the named output knot of that rod type
+   (e.g., `out.match`, `out.rows`). If `rod` is not found in the current
+   panel, the compiler MUST emit an error — cross-panel references are
+   not allowed in `from:` clauses. The `from: [rod1, rod2]` multi-input
+   form applies the same resolution to both names independently.

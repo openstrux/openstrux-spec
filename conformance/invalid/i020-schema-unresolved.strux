@@ -1,0 +1,7 @@
+// i020: validate rod schema referencing undeclared @type
+// Expected: E_SCHEMA_UNRESOLVED
+
+@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = validate { schema: NonExistentType }
+}

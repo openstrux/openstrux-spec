@@ -1,0 +1,15 @@
+// i020: @ops fields with wrong value types
+// Expected: E_OPS_TYPE_MISMATCH for retry (string instead of number),
+//           E_OPS_TYPE_MISMATCH for timeout (number instead of duration)
+
+@panel p {
+  @access { purpose: "test", operation: "read" }
+
+  r = call {
+    @ops {
+      retry: "five"
+      timeout: 30
+    }
+    endpoint: "https://api.example.com"
+  }
+}

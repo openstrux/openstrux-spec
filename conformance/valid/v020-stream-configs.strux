@@ -1,0 +1,45 @@
+// v020: All three stream adapter configs (kafka, pubsub, kinesis)
+// Tests: required fields validated, credentials optional
+
+@type LogEvent {
+  source:  string
+  level:   string
+  message: string
+  ts:      date
+}
+
+@panel log-kafka {
+  @dp { controller: "Platform Team", record: "LK-001" }
+  @access { purpose: "log_streaming", operation: "write" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "logs", tls: true } }
+
+  // kafka: required fields = brokers, topic; credentials optional
+  sink = write-data {
+    target: stream.kafka { brokers: "broker1:9092,broker2:9092", topic: "platform-logs" }
+  }
+}
+
+@panel log-pubsub {
+  @dp { controller: "Platform Team", record: "LP-001" }
+  @access { purpose: "log_streaming", operation: "write" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "logs", tls: true } }
+
+  // pubsub: required fields = project, topic
+  sink = write-data {
+    target: stream.pubsub { project: "my-gcp-project", topic: "platform-logs" }
+  }
+}
+
+@panel log-kinesis {
+  @dp { controller: "Platform Team", record: "LKN-001" }
+  @access { purpose: "log_streaming", operation: "write" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "logs", tls: true } }
+
+  // kinesis: required fields = region, stream_name; credentials optional
+  sink = write-data {
+    target: stream.kinesis { region: "us-east-1", stream_name: "platform-logs" }
+  }
+}

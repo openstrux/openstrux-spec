@@ -1,0 +1,26 @@
+// v020: Rod-level @ops decorator overriding panel-level @ops
+// Tests: @ops inside rod body, rod.ops in AST, rod wins in merge cascade
+
+@type OrderEvent {
+  order_id: string
+  status:   string
+}
+
+@panel order-processing {
+  @dp { controller: "Commerce Team", record: "OP-001" }
+  @access { purpose: "order_processing", operation: "read_write" }
+
+  // Panel-level @ops would set defaults (via context resolver)
+  // Rod-level @ops overrides for this specific rod
+  fetch = call {
+    @ops { retry: 5, timeout: 10s, circuit_breaker: { threshold: 3, window: 30s } }
+    endpoint: "https://orders.internal/api"
+  }
+
+  transform = transform { fn: "normalize-order" }
+
+  store = write-data {
+    @ops { timeout: 5s }
+    target: db.sql.postgres { host: "db.internal", port: 5432, db_name: "orders", tls: true }
+  }
+}

@@ -223,3 +223,91 @@
 // Usage: cfg.source = db.sql.postgres { ... }
 // Type path determines: adapter, cert scope, @sec requirements.
 // Full examples: see expression-shorthand.md.
+
+
+// ============================================================================
+// DataTarget Type Hierarchy
+// ============================================================================
+//
+// Mirrors DataSource union tree for write destinations.
+// Declared separately (not as a type alias) to allow independent evolution.
+// Link: if DataSource changes, review DataTarget for corresponding updates.
+//
+//   DataTarget
+//   ├── stream: StreamTarget
+//   │   ├── kafka:    KafkaWriteConfig
+//   │   ├── pubsub:   PubSubWriteConfig
+//   │   └── kinesis:  KinesisWriteConfig
+//   └── db: DbTarget
+//       ├── sql: SqlTarget
+//       │   ├── postgres:  PostgresConfig   (shared with DataSource)
+//       │   ├── mysql:     MySqlConfig      (shared with DataSource)
+//       │   └── bigquery:  BigQueryConfig   (shared with DataSource)
+//       └── nosql: NoSqlTarget
+//           ├── mongodb:   MongoConfig      (shared with DataSource)
+//           ├── dynamodb:  DynamoConfig     (shared with DataSource)
+//           └── firestore: FirestoreConfig  (shared with DataSource)
+//
+// ============================================================================
+
+
+// --- Top-level target union ---
+
+@type DataTarget = union {
+  stream:  StreamTarget
+  db:      DbTarget
+}
+
+
+// =====================
+// STREAM TARGETS
+// =====================
+
+@type StreamTarget = union {
+  kafka:    KafkaWriteConfig
+  pubsub:   PubSubWriteConfig
+  kinesis:  KinesisWriteConfig
+}
+
+@type KafkaWriteConfig {
+  brokers:        Batch<string>                 // e.g., ["broker1:9092", "broker2:9092"]
+  topic:          string
+  auth:           Optional<KafkaAuth>           // shared with KafkaConfig
+}
+
+@type PubSubWriteConfig {
+  project:        string                        // GCP project ID
+  topic:          string                        // topic to publish to
+}
+
+@type KinesisWriteConfig {
+  region:         string                        // AWS region
+  stream_name:    string
+  credentials:    Optional<AwsCredentials>      // shared with DynamoConfig; ambient if absent
+}
+
+
+// =====================
+// DATABASE TARGETS
+// =====================
+
+@type DbTarget = union {
+  sql:    SqlTarget
+  nosql:  NoSqlTarget
+}
+
+@type SqlTarget = union {
+  postgres:   PostgresConfig    // shared write+read config
+  mysql:      MySqlConfig
+  bigquery:   BigQueryConfig
+}
+
+@type NoSqlTarget = union {
+  mongodb:    MongoConfig
+  dynamodb:   DynamoConfig
+  firestore:  FirestoreConfig
+}
+
+
+// Usage: cfg.target = stream.kafka { brokers: [...], topic: "events" }
+//        cfg.target = db.sql.postgres { host: "...", ... }

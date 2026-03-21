@@ -1,0 +1,34 @@
+// v020: write-data with DataTarget — stream.kafka and db.sql
+// Tests: DataTarget type paths recognized, stream required fields present
+
+@type ClickEvent {
+  user_id:    string
+  page:       string
+  ts:         date
+}
+
+@panel click-fanout {
+  @dp { controller: "Analytics Team", record: "CF-001" }
+  @access { purpose: "click_stream", operation: "write" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "clickstream", tls: true } }
+
+  transform = transform { fn: "enrich-click" }
+
+  // DataTarget: stream.kafka — all required fields present
+  to-kafka = write-data {
+    target: stream.kafka { brokers: "kafka.internal:9092", topic: "click-events" }
+  }
+}
+
+@panel click-archive {
+  @dp { controller: "Analytics Team", record: "CA-001" }
+  @access { purpose: "click_archive", operation: "write" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "clickstream", tls: true } }
+
+  // DataTarget: db.sql — database write target
+  archive = write-data {
+    target: db.sql.postgres { host: "dw.internal", port: 5432, db_name: "data_warehouse", tls: true }
+  }
+}

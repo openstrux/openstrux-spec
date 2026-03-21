@@ -1,0 +1,24 @@
+// v020: validate rod with SchemaRef to declared @type
+// Tests: E_SCHEMA_STRING not emitted, E_SCHEMA_UNRESOLVED not emitted
+
+@type GrantApplication {
+  id:           string
+  title:        string
+  applicant:    string
+  amount:       number
+  status:       ApplicationStatus
+}
+
+@type ApplicationStatus = enum { draft, submitted, under_review, approved, rejected }
+
+@panel grant-intake {
+  @dp { controller: "NLnet Foundation", record: "GI-001" }
+  @access { purpose: "grant_intake", operation: "write" }
+
+  receive-app = receive { trigger: http { method: "POST", path: "/applications" } }
+
+  // SchemaRef: identifier (not string) resolves to declared @type
+  validate-schema = validate { schema: GrantApplication }
+
+  store = write-data { target: db.sql.postgres { host: "db.internal", port: 5432, db_name: "grants", tls: true } }
+}

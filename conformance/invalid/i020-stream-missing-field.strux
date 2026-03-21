@@ -1,0 +1,7 @@
+// i020: stream.kafka target missing required field (brokers)
+// Expected: E_STREAM_MISSING_FIELD for brokers
+
+@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.kafka { topic: "events" } }
+}

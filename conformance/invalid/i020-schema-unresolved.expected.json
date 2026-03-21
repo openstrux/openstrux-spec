@@ -1,0 +1,9 @@
+{
+  "diagnostics": [
+    {
+      "code": "E_SCHEMA_UNRESOLVED",
+      "severity": "error",
+      "messageContains": "NonExistentType"
+    }
+  ]
+}

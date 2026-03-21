@@ -164,10 +164,14 @@ cert_block    = "@cert" "{" kv_pairs "}" ;
 ## 6. Value Expressions
 
 ```ebnf
-value_expr    = string | number | bool | "null"
+value_expr    = string | number | duration | bool | "null"
               | env_ref | secret_ref | source_ref
               | type_path_value | array | object
               | expression ;
+
+duration      = digit+ duration_unit ;
+duration_unit = "s" | "m" | "h" | "d" ;
+(* Greedy rule: "5m" → duration; "5 m" → number + identifier; single unit only. *)
 
 env_ref       = "env" "(" string ")" ;
 secret_ref    = "secret_ref" "{" kv_pairs "}" ;
@@ -302,9 +306,15 @@ value_list    = "(" value { "," value } ")" ;
 name          = letter { letter | digit | "_" | "-" } ;
 letter        = "a".."z" | "A".."Z" ;
 digit         = "0".."9" ;
+number        = digit { digit } [ "." digit { digit } ] ;
 comment       = "//" (* everything until end of line *) ;
 whitespace    = " " | "\t" | "\n" | "\r" ;
 ```
+
+**Duration lexical note:** A `duration` token is emitted greedily when a digit sequence is
+immediately followed (no whitespace) by one of `s`, `m`, `h`, `d` and that unit character is
+not followed by another identifier character. Examples: `5m` → DURATION, `5 m` → NUMBER + IDENT,
+`5ms` → NUMBER + IDENT, `30s` → DURATION.
 
 Comments and whitespace are ignored by the parser except within string
 literals.

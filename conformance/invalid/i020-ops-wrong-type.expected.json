@@ -1,0 +1,14 @@
+{
+  "diagnostics": [
+    {
+      "code": "E_OPS_TYPE_MISMATCH",
+      "severity": "error",
+      "messageContains": "retry"
+    },
+    {
+      "code": "E_OPS_TYPE_MISMATCH",
+      "severity": "error",
+      "messageContains": "timeout"
+    }
+  ]
+}

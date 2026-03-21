@@ -60,6 +60,25 @@ Per [panel-shorthand.md](panel-shorthand.md):
 After normalization, all chains are explicit in the IR. The semantics
 operate on the explicit snap graph only.
 
+#### Implicit Chaining Rules 7 and 8
+
+These rules formalize two patterns that are correct by convention but were
+previously unstated. A conformant compiler MUST implement them.
+
+**Rule 7 — Source rod starts the implicit chain:**
+If the first rod in declaration order is a source rod (inKind = null, e.g.,
+`read-data`, `receive`), it begins the implicit chain. The next rod's default
+input knot receives from this source's default output knot. Subsequent rods
+chain in declaration order unless overridden by `from:`.
+
+**Rule 8 — Sink rod ends the implicit chain:**
+If the last rod in declaration order is a sink rod (outKind = null, e.g.,
+`write-data`, `respond`), it receives from the immediately preceding rod's
+default output knot. A sink rod does not propagate further. No implicit chain
+extends past a sink. If a non-sink rod follows a sink rod in declaration order,
+it MUST have an explicit `from:` clause — a conformant compiler MUST emit an
+error if this is missing.
+
 ## Type Narrowing at Evaluation Time
 
 Union types are narrowed at compile time via type paths (see

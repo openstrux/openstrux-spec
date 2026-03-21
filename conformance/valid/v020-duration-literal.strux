@@ -1,0 +1,26 @@
+// v020: Duration literal values in window.size and @ops.timeout
+// Tests: DURATION lexer token, DurationLiteral AST node, parser handling
+
+@type EventRecord {
+  id:         string
+  event_type: string
+  ts:         date
+}
+
+@panel event-windowing {
+  @dp { controller: "Platform Team", record: "EW-001" }
+  @access { purpose: "event_aggregation", operation: "read" }
+
+  src = read-data { source: db.sql.postgres { host: "db.internal", port: 5432, db_name: "events", tls: true } }
+
+  // duration in cfg position
+  win = window { size: 5m, kind: fixed }
+
+  // duration in rod-level @ops
+  agg = aggregate {
+    @ops { timeout: 30s, retry: 3 }
+    fn: COUNT(*)
+  }
+
+  sink = write-data { target: db.sql.postgres { host: "db.internal", port: 5432, db_name: "results", tls: true } }
+}

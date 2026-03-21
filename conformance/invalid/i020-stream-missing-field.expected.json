@@ -1,0 +1,9 @@
+{
+  "diagnostics": [
+    {
+      "code": "E_STREAM_MISSING_FIELD",
+      "severity": "error",
+      "messageContains": "brokers"
+    }
+  ]
+}

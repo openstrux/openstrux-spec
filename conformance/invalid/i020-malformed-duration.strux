@@ -1,0 +1,13 @@
+// i020: Malformed duration values
+// Expected: E_OPS_TYPE_MISMATCH (timeout is a string, not duration)
+// Note: "5m" as string parses as string kind; 5x = NUMBER "5" + IDENT "x" (parse error in context)
+
+@panel p {
+  @access { purpose: "test", operation: "read" }
+
+  // timeout as string literal — should be duration (E_OPS_TYPE_MISMATCH)
+  r = call {
+    @ops { timeout: "30s" }
+    endpoint: "https://api.example.com"
+  }
+}

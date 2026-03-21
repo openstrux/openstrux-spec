@@ -1,0 +1,9 @@
+{
+  "diagnostics": [
+    {
+      "code": "E_SCHEMA_STRING",
+      "severity": "error",
+      "messageContains": "UserPayload"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+// i020: validate rod schema using string literal instead of identifier
+// Expected: E_SCHEMA_STRING
+
+@type UserPayload { id: string, name: string }
+
+@panel p {
+  @access { purpose: "test", operation: "read" }
+  // Wrong: schema as string literal — use identifier instead
+  r = validate { schema: "UserPayload" }
+}

@@ -209,7 +209,35 @@ Formal EBNF for type definitions: see [grammar.md §2](grammar.md).
 
 ---
 
-## 8. Migration from v0.3
+## 8. DataTarget
+
+`DataTarget` mirrors `DataSource` as the union type for write destinations.
+Where `read-data` uses `cfg.source: DataSource`, `write-data` uses `cfg.target: DataTarget`.
+
+Both are defined in [`specs/modules/datasource-hierarchy.strux`](../modules/datasource-hierarchy.strux).
+The union trees are parallel (same adapter prefixes: `stream.kafka`, `db.sql.postgres`, etc.)
+but declared separately to allow independent evolution.
+
+Type path syntax for targets is identical to sources:
+
+```
+cfg.target = stream.kafka { brokers: [...], topic: "events" }
+cfg.target = db.sql.postgres { host: "...", ... }
+```
+
+Stream target paths (`stream.kafka`, `stream.pubsub`, `stream.kinesis`) have required fields:
+
+| Adapter         | Required fields               |
+|-----------------|-------------------------------|
+| `stream.kafka`  | `brokers`, `topic`            |
+| `stream.pubsub` | `project`, `topic`            |
+| `stream.kinesis`| `region`, `stream_name`       |
+
+See `datasource-hierarchy.strux` for the complete field definitions.
+
+---
+
+## 9. Migration from v0.3
 
 Existing v0.3 `@type` records and enums are unchanged. The only new form is
 `union`. Existing rods like `read-db` with `cfg.db = "postgres"` still work —
