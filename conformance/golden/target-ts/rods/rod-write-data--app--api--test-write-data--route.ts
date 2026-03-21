@@ -2,10 +2,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// write-data: store-proposal
+// write-data: store-op
 // TODO: implement write — prisma.<model>.create({ data: input })
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  // TODO: implement intake-proposals/intake
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  // TODO: implement test-write-data/receive
   return NextResponse.json({ ok: true });
 }

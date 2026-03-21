@@ -1,0 +1,38 @@
+{
+  "entries": [
+    {
+      "hash": "ab99b790ef302bb1298251ee7d913d7c31acd3dcca852bfaf58a0a703158c4a3",
+      "key": "DataSource",
+      "kind": "type",
+      "version": "0.6"
+    },
+    {
+      "hash": "4aee6101c0fbb7ac4ad3b100e685a3f79a6bb568a253f6d031d00db642205540",
+      "key": "PostgresConfig",
+      "kind": "type",
+      "version": "0.6"
+    },
+    {
+      "hash": "875ce8bdf5f9a985c2b5e11180c9ba6ea63ad2bfbd419af8e749fe9a5f74adc6",
+      "key": "Proposal",
+      "kind": "type",
+      "version": "0.6"
+    },
+    {
+      "hash": "89c6bf42d5b5510a9338dd8bc5650d546a029980422d20b07353235691c5d069",
+      "key": "ReviewStatus",
+      "kind": "type",
+      "version": "0.6"
+    },
+    {
+      "hash": "598035a36e8b3033c920c1d0cda16ef82feaf1ff6b9f7cf26295b71947830909",
+      "key": "SqlSource",
+      "kind": "type",
+      "version": "0.6"
+    }
+  ],
+  "generatedAt": "__GENERATED_AT__",
+  "lockVersion": "0.6",
+  "sourceHash": "95a213cbc1680ef7a6e989db3440129411b0af2002a76ed7a3c90c8da9b4f351",
+  "specVersion": "0.6.0"
+}
