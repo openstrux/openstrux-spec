@@ -1,6 +1,6 @@
 # ADR-019: Generated Output as Native Package
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-03-21
 - **Updated:** 2026-03-21
 - **Context:** The current TypeScript target adapter emits generated files

@@ -2,10 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// write-data: store-op
-// TODO: implement write — prisma.<model>.create({ data: input })
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  // TODO: implement test-write-data/receive
-  return NextResponse.json({ ok: true });
+  const body = await req.json();
+  const result = (body as unknown[]).filter((item) => item);
+  return NextResponse.json(result, { status: 200 });
 }

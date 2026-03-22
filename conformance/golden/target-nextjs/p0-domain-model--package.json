@@ -1,0 +1,17 @@
+{
+  "name": "@openstrux/build",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.ts"
+    },
+    "./schemas": {
+      "types": "./schemas/index.ts"
+    },
+    "./handlers": {
+      "types": "./handlers/index.ts"
+    }
+  }
+}

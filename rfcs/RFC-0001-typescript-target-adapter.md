@@ -3,16 +3,18 @@
 - **Status:** Accepted
 - **Proposed by:** Olivier Fabre
 - **Date:** 2026-03-20
+- **Updated:** 2026-03-21 (ADR-019: emit/package split, framework-specific naming)
 
 ---
 
 ## Summary
 
-This RFC defines the normative contract for OpenStrux target adapters, using the TypeScript adapter
-as the reference implementation. An adapter receives a validated AST and manifest, and returns an
-array of `GeneratedFile` objects. A static adapter registry maps target names to adapter
-implementations. This contract is the extension point for all future code-generation targets
-(Beam Python, Terraform, etc.).
+This RFC defines the normative contract for OpenStrux target adapters, using the Next.js adapter
+as the reference implementation. An adapter receives a validated AST, manifest, and resolved
+options, and produces two outputs: `emit()` returns generated source files as an array of
+`GeneratedFile` objects; `package()` wraps those files into an ecosystem-native build artifact.
+A static adapter registry maps framework names to adapter implementations. This contract is the
+extension point for all future code-generation targets (Beam Python, Terraform, etc.).
 
 ## Motivation
 
@@ -21,8 +23,8 @@ Target generation is the core value proposition: from a validated, manifest-stam
 generator emits deployable artifacts. Without a stable adapter contract, every target would need
 to wire directly into the engine, making the system non-extensible.
 
-The TypeScript target is needed immediately for the v0.6.0 demo (NLnet grant-workflow use case:
-Next.js/Prisma/Zod/Keycloak). RFC-0001 stabilises the contract first so that the TypeScript adapter
+The Next.js target is needed immediately for the v0.6.0 demo (NLnet grant-workflow use case:
+Next.js/Prisma/Zod/Keycloak). RFC-0001 stabilises the contract first so that the Next.js adapter
 is not an accidental template — it is an intentional reference implementation of a specified
 interface.
 
@@ -35,43 +37,74 @@ interface.
  * A single generated output file.
  */
 export interface GeneratedFile {
-  /** Relative path from the generator output root. */
+  /** Relative path from the package output directory. */
   path: string;
   /** File content as a string. */
   content: string;
-  /** Language identifier (e.g., "typescript", "prisma", "markdown"). */
+  /** Language identifier (e.g., "typescript", "prisma", "json"). */
   lang: string;
 }
 
 /**
- * Options passed to the generator and adapter.
+ * Resolved dependency entry from config + adapter manifest matching.
  */
-export interface GenerateOptions {
-  /** Target identifier. Must match a registered adapter key. */
-  target: string;
-  /** Optional: Next.js version string. Defaults to "14". */
-  nextVersion?: string;
-  /** Optional: additional target-specific options. */
-  [key: string]: unknown;
+export interface ResolvedDep {
+  name: string;
+  version: string;
+  adapter: string;
+}
+
+/**
+ * Options passed to the adapter after config resolution.
+ */
+export interface ResolvedOptions {
+  framework: ResolvedDep;
+  orm: ResolvedDep;
+  validation: ResolvedDep;
+  runtime: ResolvedDep;
+}
+
+/**
+ * The output of the adapter's package() method.
+ */
+export interface PackageOutput {
+  /** Output directory relative to the project root (default: ".openstrux/build"). */
+  outputDir: string;
+  /** Ecosystem metadata files: package.json, tsconfig.json, etc. */
+  metadata: GeneratedFile[];
+  /** Barrel export files: index.ts, schemas/index.ts, handlers/index.ts. */
+  entrypoints: GeneratedFile[];
 }
 
 /**
  * The adapter interface every target must implement.
  */
 export interface Adapter {
+  /** Adapter name, matching the registry key (e.g. "nextjs"). */
+  name: string;
+
   /**
-   * Generate output files from a validated AST and manifest.
+   * Emit source files from a validated AST and manifest.
+   * All GeneratedFile.path values are relative to the package output directory.
    *
-   * @param ast     - Validated OpenStrux AST (array of top-level nodes)
+   * @param ast      - Validated OpenStrux AST (array of top-level nodes)
    * @param manifest - Parsed mf.strux.json manifest object
-   * @param options  - Generator options (target, nextVersion, etc.)
-   * @returns Array of generated files. Order within the array is not normative.
+   * @param options  - Resolved adapter options (framework, orm, validation, runtime)
+   * @returns Array of generated source files. Order is not normative.
    */
-  generate(
+  emit(
     ast: TopLevelNode[],
     manifest: Manifest,
-    options: GenerateOptions,
+    options: ResolvedOptions,
   ): GeneratedFile[];
+
+  /**
+   * Wrap emitted files in an ecosystem-native package.
+   *
+   * @param files - The files returned by emit()
+   * @returns Package metadata and entrypoints
+   */
+  package(files: GeneratedFile[]): PackageOutput;
 }
 ```
 
@@ -86,29 +119,29 @@ export type TopLevelNode = TypeRecord | TypeEnum | TypeUnion | Panel;
 
 ### Manifest Type
 
-The manifest is the parsed `mf.strux.json` object. For this RFC the adapter receives it as
-`Record<string, unknown>`. A typed `Manifest` interface will be defined in `@openstrux/manifest`
-(existing package); adapters should treat it as opaque unless they need specific fields.
-
 ```typescript
 export type Manifest = Record<string, unknown>;
 ```
 
 ### Adapter Registry
 
-The registry maps string target names to adapter implementations.
+The registry maps framework names to adapter implementations.
 
 ```typescript
 const registry: Map<string, Adapter> = new Map();
 
-export function registerAdapter(target: string, adapter: Adapter): void {
-  registry.set(target, adapter);
+export function registerAdapter(framework: string, adapter: Adapter): void {
+  registry.set(framework, adapter);
 }
 
-export function getAdapter(target: string): Adapter {
-  const adapter = registry.get(target);
-  if (!adapter) throw new UnknownTargetError(target);
+export function getAdapter(framework: string): Adapter {
+  const adapter = registry.get(framework);
+  if (!adapter) throw new UnknownTargetError(framework);
   return adapter;
+}
+
+export function listTargets(): string[] {
+  return Array.from(registry.keys());
 }
 ```
 
@@ -116,8 +149,8 @@ export function getAdapter(target: string): Adapter {
 
 ```typescript
 export class UnknownTargetError extends Error {
-  constructor(target: string) {
-    super(`No adapter registered for target: "${target}"`);
+  constructor(framework: string) {
+    super(`No adapter registered for target: "${framework}"`);
     this.name = "UnknownTargetError";
   }
 }
@@ -129,51 +162,65 @@ export class UnknownTargetError extends Error {
 export function generate(
   ast: TopLevelNode[],
   manifest: Manifest,
-  options: GenerateOptions,
+  options: ResolvedOptions,
 ): GeneratedFile[] {
-  const adapter = getAdapter(options.target);
-  return adapter.generate(ast, manifest, options);
+  const adapter = getAdapter(options.framework.name);
+  return adapter.emit(ast, manifest, options);
 }
 ```
 
-### Target Selection
+### Framework-Specific Adapter Keys
 
-The caller sets `options.target` to the registered adapter key. For v0.6.0 the only registered key
-is `"typescript"`. The registry is intentionally keyed on strings so that future targets (e.g.,
-`"beam-python"`, `"terraform"`) can be registered at startup without changes to the engine.
+Adapters are registered under their framework name, not a language name. For v0.6.0 the only
+registered key is `"nextjs"`.
+
+```typescript
+import { NextJsAdapter } from "./adapters/nextjs/index.js";
+registerAdapter("nextjs", NextJsAdapter);
+```
+
+The registry is keyed on strings so future targets (`"nestjs"`, `"beam-python"`, `"terraform"`)
+can be registered without changes to the engine.
 
 ### Adapter Lifecycle
 
-Adapters are stateless pure functions: they receive inputs, return outputs, and do not mutate
-shared state. The registry is populated at module load time (import side-effects). Adapter
-implementations MAY accumulate state within a single `generate()` call (e.g., a Prisma schema
-accumulator) but MUST NOT retain state across calls.
+Adapters are stateless: they receive inputs, return outputs, and do not mutate shared state.
+`emit()` MAY accumulate state within a single call (e.g., Prisma schema accumulator) but MUST
+NOT retain state across calls.
 
-### Static Registry (v0.6.0)
+### Compatibility Manifest
 
-For v0.6.0 the registry is hardcoded:
+Each adapter declares the framework and library versions it supports:
 
-```typescript
-import { TypeScriptAdapter } from "./adapters/typescript/index.js";
-registerAdapter("typescript", TypeScriptAdapter);
+```yaml
+name: adapter/nextjs
+version: 1.2.0
+supports:
+  framework: next@>=14.0 <17.0
+  base: typescript@>=5.0
+  orm:
+    - prisma@>=5.0 <7.0
+  validation:
+    - zod@>=3.20
+  runtime:
+    - node@>=18
 ```
 
-Plugin discovery (npm package scanning, adapter manifests) is deferred to post-0.6.0.
+The generator resolves the project's `strux.config.yaml` semver ranges against these manifests
+to produce `ResolvedOptions`.
 
 ### Output File Conventions
 
-- All paths in `GeneratedFile.path` are relative to the generator output root.
-- The output root is determined by the caller (e.g., a CLI flag `--out`).
-- The generator does NOT write files to disk — that is the CLI's responsibility.
-- Files returned by the adapter MAY be accumulated (multiple rods contributing to the same path);
-  the engine accumulates by path before returning. If two adapter calls return the same path, the
-  second content replaces the first unless the adapter uses internal accumulation.
+- All paths in `GeneratedFile.path` are relative to the package output directory
+- The output directory defaults to `.openstrux/build/` and is determined by `PackageOutput.outputDir`
+- The generator does NOT write files to disk — that is the CLI's responsibility
+- Files with the same path returned by the adapter are not accumulated; the adapter uses internal
+  state to combine multiple contributions to the same file (e.g., `prisma/schema.prisma`)
 
 ### Generator Specification Reference
 
-The normative mapping rules from AST nodes to TypeScript artifacts are defined in
-`specs/modules/target-ts/generator.md`. That document is the source of truth for the TypeScript
-adapter implementation and golden fixture validation.
+The normative engine spec is in `specs/generator/generator.md`. The normative Next.js adapter
+mapping rules are in `specs/modules/target-nextjs/generator.md` and `specs/modules/target-nextjs/rods.md`.
 
 ## Drawbacks
 
@@ -182,6 +229,10 @@ adapter implementation and golden fixture validation.
   `@openstrux/manifest` package that callers should use before invoking the generator.
 
 ## Alternatives Considered
+
+**Single `generate()` method on the adapter (no `package()`):** The original RFC-0001 design.
+Deferred packaging logic to the caller. Does not support ecosystem-native packaging profiles
+(package.json, barrel exports) without ad-hoc conventions. Superseded by ADR-019.
 
 **Plugin discovery via `package.json` exports:** Deferred. Adds significant complexity with no
 benefit for the single-target v0.6.0 milestone.
@@ -193,6 +244,10 @@ would require breaking changes to add the second target.
 **`GeneratedFile` with `Buffer` content instead of `string`:** Rejected. All OpenStrux generated
 artifacts are text files. `string` is simpler and serialisable without encoding concerns.
 
+**Adapter registered as `"typescript"` (language-level):** Rejected. TypeScript is the language,
+not the stack. A team using Express + Drizzle produces fundamentally different code from one
+using Next.js + Prisma. Framework-level naming is honest. See ADR-019.
+
 ## Unresolved Questions
 
 - Should the adapter contract include a `validate()` method for pre-generation checks? Deferred.
@@ -200,13 +255,13 @@ artifacts are text files. `string` is simpler and serialisable without encoding 
 
 ## Implementation Plan
 
-1. `openstrux-spec`: This RFC + `specs/modules/target-ts/generator.md` + golden fixtures
-2. `openstrux-core`: New `packages/generator/` implementing the contract defined here
+1. `openstrux-spec`: This RFC + `specs/generator/generator.md` + `specs/modules/target-nextjs/` + golden fixtures
+2. `openstrux-core`: Update `packages/generator/` implementing the contract defined here
 
 ## Annex A: Canonical Source Form for Content Hashing
 
 This annex defines the exact canonicalization algorithm used to produce a stable content hash for
-any generated file. The hash is used by the manifest system to certify generated artifacts.
+any generated file.
 
 ### Algorithm
 
@@ -214,7 +269,7 @@ Given a `GeneratedFile` with `content: string`:
 
 1. **Normalize line endings:** Replace all `\r\n` and lone `\r` with `\n`.
 2. **Strip trailing whitespace:** For each line, remove all trailing space/tab characters.
-3. **Strip leading blank lines:** Remove all leading blank lines (lines containing only `\n`).
+3. **Strip leading blank lines:** Remove all leading blank lines.
 4. **Strip trailing blank lines:** Remove all trailing blank lines.
 5. **Append final newline:** Ensure the content ends with exactly one `\n`.
 6. **Encode:** Convert the resulting string to UTF-8 bytes.
@@ -227,18 +282,10 @@ Given a `GeneratedFile` with `content: string`:
 import { createHash } from "node:crypto";
 
 export function canonicalHash(content: string): string {
-  // Step 1: normalize line endings
   let s = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  // Step 2: strip trailing whitespace per line
-  s = s
-    .split("\n")
-    .map((l) => l.trimEnd())
-    .join("\n");
-  // Step 3-4: strip leading/trailing blank lines
+  s = s.split("\n").map((l) => l.trimEnd()).join("\n");
   s = s.replace(/^\n+/, "").replace(/\n+$/, "");
-  // Step 5: append final newline
   s = s + "\n";
-  // Steps 6-8: SHA-256 hex
   return createHash("sha256").update(s, "utf8").digest("hex");
 }
 ```
@@ -252,13 +299,12 @@ export function canonicalHash(content: string): string {
 | `"  hello  \n"`   | `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` |
 | `"\n\nhello\n\n"` | `5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03` |
 
-Note: `"hello\n"` after canonicalization is `"hello\n"`. SHA-256(`hello\n`) = the first vector.
-
 ---
 
 ## Decision Record
 
-| Date       | Event                                                             |
-| ---------- | ----------------------------------------------------------------- |
-| 2026-03-20 | Draft opened — Olivier Fabre (AI-assisted)                        |
-| 2026-03-20 | Self-accepted by Olivier Fabre (bootstrap phase, sole maintainer) |
+| Date       | Event                                                              |
+| ---------- | ------------------------------------------------------------------ |
+| 2026-03-20 | Draft opened — Olivier Fabre (AI-assisted)                         |
+| 2026-03-20 | Self-accepted by Olivier Fabre (bootstrap phase, sole maintainer)  |
+| 2026-03-21 | Updated for ADR-019: emit/package split, nextjs adapter name       |
