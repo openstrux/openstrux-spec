@@ -76,12 +76,12 @@ export async function <METHOD>(req: NextRequest): Promise<NextResponse> {
 }
 ```
 
-#### Scenario: Linear pipeline produces complete handler
+### Scenario: Linear pipeline produces complete handler
 
 - **WHEN** a panel contains `receive (POST) → validate → write-data → respond`
 - **THEN** `handlers/<panel-name>.ts` SHALL export a complete async function with no TODO stubs
 
-#### Scenario: Handler imports are deduplicated
+### Scenario: Handler imports are deduplicated
 
 - **WHEN** two steps both need `import { prisma } from "../lib/prisma.js"`
 - **THEN** the output SHALL contain exactly one such import
@@ -289,7 +289,7 @@ The following rod types produce `STRUX-STUB` chain steps. They do not crash the 
 | `join`      | `// STRUX-STUB: join — <rod-name> — not implemented in v0.6`           |
 | `window`    | `// STRUX-STUB: window — <rod-name> — not implemented in v0.6`         |
 
-#### Scenario: Tier 2 stub is grep-able
+### Scenario: Tier 2 stub is grep-able
 
 - **WHEN** a Tier 2 rod appears in a panel
 - **THEN** the generated handler SHALL contain the literal string `STRUX-STUB`

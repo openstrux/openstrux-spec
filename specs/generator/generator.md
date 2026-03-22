@@ -98,7 +98,7 @@ function getAdapter(framework: string): Adapter   // throws UnknownTargetError i
 function listTargets(): string[]
 ```
 
-#### Scenario: Unknown framework throws
+### Scenario: Unknown framework throws
 
 - **WHEN** `getAdapter("no-such-framework")` is called
 - **THEN** `UnknownTargetError` SHALL be thrown with the framework name in the message
@@ -117,7 +117,7 @@ The `strux build` command orchestrates the following steps in order:
 6. **Package** — call `adapter.package(files)` → `PackageOutput`
 7. **Write** — write all files to `packageOutput.outputDir` (default `.openstrux/build/`)
 
-#### Scenario: Build pipeline runs end to end
+### Scenario: Build pipeline runs end to end
 
 - **WHEN** `strux build` is invoked with a valid config, valid `.strux` files, and a compatible adapter
 - **THEN** the output directory SHALL contain all emitted source files, metadata files, and barrel entrypoints
@@ -140,7 +140,7 @@ target:
 All version strings MUST be npm-style semver ranges. The `framework` field determines which
 adapter is selected. If no adapter satisfies all ranges, the build fails with a resolution error.
 
-#### Scenario: Config resolution produces ResolvedOptions
+### Scenario: Config resolution produces ResolvedOptions
 
 - **WHEN** config contains `framework: next@^15.0` and adapter `adapter/nextjs@1.2.0` declares `next@>=14.0 <17.0`
 - **THEN** `ResolvedOptions.framework` SHALL be `{ name: "next", version: "15.1.2", adapter: "adapter/nextjs@1.2.0" }`
@@ -167,7 +167,7 @@ supports:
 
 For v0.6, adapters are bundled with the CLI. Hub-based discovery is future work.
 
-#### Scenario: Incompatible adapter not selected
+### Scenario: Incompatible adapter not selected
 
 - **WHEN** config requests `framework: next@^16.0` and only `adapter/nextjs@1.2.0` supporting `next@>=14.0 <16.0` is available
 - **THEN** adapter resolution SHALL fail with a clear error message
@@ -180,7 +180,7 @@ All `GeneratedFile.path` values returned by `adapter.emit()` SHALL be relative t
 output directory — not the project root. The engine prepends the output directory when writing
 files to disk.
 
-#### Scenario: Type file path is package-relative
+### Scenario: Type file path is package-relative
 
 - **WHEN** the adapter emits a type file for `@type Proposal`
 - **THEN** `GeneratedFile.path` SHALL be `types/Proposal.ts`, not `.openstrux/build/types/Proposal.ts`
@@ -193,6 +193,7 @@ Each adapter implementation is tested by running `adapter.emit()` against confor
 and diffing the output against golden files in `conformance/golden/<adapter-name>/`.
 
 Normalisation rules (applied before diff):
+
 1. Collapse consecutive blank lines to a single blank line
 2. Trim trailing whitespace per line
 3. Sort import statements alphabetically within each contiguous import block
