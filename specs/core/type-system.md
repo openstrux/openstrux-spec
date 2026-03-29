@@ -1,65 +1,12 @@
-# OpenStrux v0.4 — Strux Type System Refinement
+# OpenStrux v0.4 — Type System
 
-## Problem Statement
-
-v0.3 has `@type` for records and `enum` for flat enumerations. But real-world
-data access requires **type hierarchies**: a datasource is either a stream or a
-database; a database is either SQL or NoSQL; SQL is either Postgres or MySQL.
-
-This is not inheritance. It's **discriminated unions** — a pattern native to
-TypeScript, Rust, Haskell, and every type system that matters. We add it to
-OpenStrux as `union`.
+OpenStrux has three `@type` forms: records, enums, and discriminated unions.
+Unions enable typed hierarchies for datasources, service targets, and other
+config structures that branch by kind.
 
 ---
 
-## 1. Union Types (Discriminated Unions)
-
-### Syntax
-
-```
-@type DataSource = union {
-  stream:  StreamSource
-  db:      DbSource
-}
-```
-
-Each variant is a `tag: Type` pair. The tag is the discriminant. The type is
-any valid strux (record, enum, union, or primitive).
-
-### Nesting
-
-Unions nest. The full DataSource tree is defined in
-[datasource-hierarchy.strux](../modules/datasource-hierarchy.strux).
-Every rod that needs a datasource references these types — it doesn't
-reinvent them.
-
-### Type Narrowing
-
-When a `cfg` knot has a union type, setting its value narrows the type
-down the tree. This is compile-time resolution:
-
-```
-cfg:  source  DataSource                       // full union
-cfg.source = db.sql.postgres                   // narrows to PostgresConfig
-```
-
-After narrowing, the rod instance knows exactly which adapter it needs. No
-runtime branching on datasource kind.
-
-### Comparison to v0.3
-
-| v0.3 (enum)                              | v0.4 (union)                         |
-|------------------------------------------|--------------------------------------|
-| `@type DbType = enum { postgres, mysql }` | `@type SqlSource = union { postgres: PostgresConfig, mysql: MySqlConfig }` |
-| Flat list of string values               | Each variant carries its own config  |
-| Rod must interpret string + guess config | Rod receives typed, validated config |
-| No hierarchy                             | Composable tree of types             |
-
----
-
-## 2. Three Type Forms
-
-After this refinement, OpenStrux has three `@type` forms:
+## 1. Three Type Forms
 
 | Form     | Purpose                          | Example                                |
 |----------|----------------------------------|----------------------------------------|
@@ -71,10 +18,42 @@ The default form is `record`. Explicit keyword required for `enum` and `union`.
 
 ---
 
+## 2. Union Types (Discriminated Unions)
+
+### Syntax
+
+```
+@type DataSource = union {
+  stream:  StreamSource
+  db:      DbSource
+}
+```
+
+Each variant is a `tag: Type` pair. The tag is the discriminant. The type is
+any valid strux type (record, enum, union, or primitive).
+
+### Nesting
+
+Unions nest. The full DataSource tree is defined in
+[datasource-hierarchy.strux](../modules/datasource-hierarchy.strux).
+
+### Type Narrowing
+
+When a `cfg` knot has a union type, setting its value narrows the type
+down the tree. This is compile-time resolution:
+
+```
+cfg:  source  DataSource                       // full union
+cfg.source = db.sql.postgres                   // narrows to PostgresConfig
+```
+
+After narrowing, the rod instance knows exactly which adapter it needs.
+
+---
+
 ## 3. Type Paths
 
-Union types introduce **type paths** — dot-separated paths through the union
-tree that resolve to a concrete type:
+Dot-separated paths through the union tree that resolve to a concrete type:
 
 ```
 DataSource.db.sql.postgres   →   PostgresConfig
@@ -98,16 +77,11 @@ db.*               — any database
 *                  — any datasource
 ```
 
-This enables certification at any level of specificity:
-
-- "Tested with Postgres" → `{ source: "db.sql.postgres" }`
-- "Tested with any SQL" → `{ source: "db.sql.*" }`
-
 ---
 
 ## 4. cfg Knots with Union Types
 
-When a `cfg` knot references a union type, the panel must provide a concrete
+When a `cfg` knot references a union type, the panel provides a concrete
 path + config:
 
 ```
@@ -122,29 +96,15 @@ path + config:
 }
 ```
 
-This replaces the v0.3 pattern of separate `cfg.db = "postgres"` + many `arg.*`
-values. The datasource config is now a single typed, validated structure.
-
-### What moves from arg to cfg
-
-| v0.3                                      | v0.4                                    |
-|-------------------------------------------|-----------------------------------------|
-| `cfg.db = "postgres"` (string)            | `cfg.source = db.sql.postgres { ... }`  |
-| `arg.host`, `arg.port`, `arg.tls` (loose) | Part of `PostgresConfig` (typed)        |
-| Different cfg = different cert scope      | Same: different source path = different cert scope |
-
-Benefits:
-
-- **Type safety**: PostgresConfig requires `host`, `port`, `db_name` — compiler catches missing fields
-- **One-shot validation**: The full config is validated at compile time
-- **Adapter resolution**: The type path `db.sql.postgres` deterministically selects the adapter
-- **Cert scoping**: `{ source: "db.sql.postgres" }` is richer than `{ db: "postgres" }`
+The datasource config is a single typed, validated structure. The compiler
+catches missing fields at build time, and the type path deterministically
+selects the adapter.
 
 ---
 
 ## 5. Adapters
 
-An adapter is the implementation behind a union variant. It's what actually
+An adapter is the implementation behind a union variant — what actually
 connects to Postgres, reads from Kafka, etc.
 
 ### Adapter Registration
@@ -173,8 +133,8 @@ Adapters are:
 
 - **Per union leaf**: PostgresConfig has its own, MongoConfig has its own
 - **Per translation target**: Beam Python gets one adapter, TypeScript gets another
-- **Registered in hub**: Shared, versioned, certified just like rods
-- **Pure mapping**: No business logic — just config translation to target framework
+- **Registered in hub**: Shared, versioned, certified
+- **Pure mapping**: No business logic — config translation to target framework only
 
 ### Adapter Resolution Chain
 
@@ -192,31 +152,13 @@ Generated code: ReadFromJdbc(jdbc_url="jdbc:postgresql://...")
 
 ---
 
-## 6. Relation to State of the Art
-
-See [design-notes.md §State of the Art](design-notes.md) for the full
-comparison to Prisma, Beam, Spark, dbt, and Terraform.
-
-The key differentiator: none of the above have built-in access control
-and intent at the type level. See
-[access-context.strux](access-context.strux).
-
----
-
-## 7. Grammar
-
-Formal EBNF for type definitions: see [grammar.md §2](grammar.md).
-
----
-
-## 8. DataTarget
+## 6. DataTarget
 
 `DataTarget` mirrors `DataSource` as the union type for write destinations.
 Where `read-data` uses `cfg.source: DataSource`, `write-data` uses `cfg.target: DataTarget`.
 
 Both are defined in [`specs/modules/datasource-hierarchy.strux`](../modules/datasource-hierarchy.strux).
-The union trees are parallel (same adapter prefixes: `stream.kafka`, `db.sql.postgres`, etc.)
-but declared separately to allow independent evolution.
+The union trees are parallel but declared separately to allow independent evolution.
 
 Type path syntax for targets is identical to sources:
 
@@ -233,18 +175,8 @@ Stream target paths (`stream.kafka`, `stream.pubsub`, `stream.kinesis`) have req
 | `stream.pubsub` | `project`, `topic`            |
 | `stream.kinesis`| `region`, `stream_name`       |
 
-See `datasource-hierarchy.strux` for the complete field definitions.
-
 ---
 
-## 9. Migration from v0.3
+## 7. Grammar
 
-Existing v0.3 `@type` records and enums are unchanged. The only new form is
-`union`. Existing rods like `read-db` with `cfg.db = "postgres"` still work —
-but the recommended pattern is to migrate to union-typed cfg knots.
-
-The v0.3 `read-db` rod becomes the v0.4 `read-data` rod:
-
-- `read-db` → `read-data` (broader: handles streams too, not just databases)
-- `cfg.db string ["postgres", "mysql"]` → `cfg.source DataSource`
-- Separate `arg.*` for connection → typed config inside the union variant
+Formal EBNF for type definitions: see [grammar.md §2](grammar.md).

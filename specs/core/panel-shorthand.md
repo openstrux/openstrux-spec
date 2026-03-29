@@ -1,63 +1,41 @@
 # OpenStrux v0.4 — Panel Shorthand
 
-## Problem
-
-The context-inherited panel (18 lines, ~209 tokens) still carries
-structural overhead that doesn't convey meaning:
-
-```
-  @rod f = filter {                          // "@rod" and "=" are ceremony
-    arg.predicate = address.country IN ...   // "arg." is redundant (compiler knows)
-    snap db.out.rows -> in.data              // snap is predictable (linear chain)
-  }
-```
-
-~67 tokens (32%) are structural: `@rod`, `=`, `cfg.`, `arg.`, `snap`,
-`out.`, `in.`, `->`. All resolvable by the compiler from the rod type
-definition and declaration order.
+Four syntactic-sugar rules that reduce structural ceremony in panels.
+Both verbose and shorthand forms normalize to the same AST.
 
 ---
 
-## Four Rules
-
-### Rule 1: Drop `@rod` and `=`
+## Rule 1: `@rod` keyword optional
 
 Inside a `@panel` block, every statement that isn't `@dp`/`@access`
-is a rod. The `@rod` keyword is redundant. Rod names use `=` to
-separate name from type, but `:` is already the assignment operator
-in strux records. Unify:
+is a rod. The `@rod` keyword is redundant:
 
 ```
-// Before:
+// Verbose:
 @rod db = read-data { cfg.source = @production, cfg.mode = "scan" }
 
-// After:
+// Shorthand:
 db = read-data { source: @production, mode: "scan" }
 ```
 
-The `@rod` prefix remains valid (backward compatible) but is not
-required in panels.
+`@rod` remains valid (backward compatible) but is not required.
 
-### Rule 2: Drop `cfg.` / `arg.` prefixes
+## Rule 2: `cfg.` / `arg.` prefixes optional
 
-The rod type definition declares which knots are cfg and which are
-arg. Inside a rod block, the compiler resolves the prefix from context:
+The compiler resolves prefixes from the rod type definition:
 
 ```
-// Before:
+// Verbose:
 cfg.algo = "sha256", arg.fields = ["full_name", "email"]
 
-// After:
+// Shorthand:
 algo: "sha256", fields: ["full_name", "email"]
 ```
-
-Resolution: the compiler looks up the rod type definition for
-`pseudonymize` and finds `cfg: algo` and `arg: fields`. No ambiguity.
 
 If a custom rod has overlapping names (cfg.x and arg.x), the compiler
 emits an error and requires explicit prefix.
 
-### Rule 3: Implicit linear snaps
+## Rule 3: Implicit linear snaps
 
 Rods in declaration order form an **implicit chain**: each rod reads
 from the **default output** of the preceding rod into its own
@@ -101,7 +79,6 @@ dlq = write-data { target: @dlq, from: f.reject }
 ```
 
 `from: rod.knot` is shorthand for `snap rod.out.knot -> in.{default}`.
-The `out.` prefix is dropped (you always read from outputs).
 
 For multi-input rods (join, merge):
 
@@ -110,21 +87,21 @@ j = join { mode: "inner", on: left.id == right.id, from: [users, orders] }
 //   ↑ first = left, second = right
 ```
 
-### Rule 4: Flatten @access
+## Rule 4: Flatten @access
 
 Drop the `intent:` wrapper when setting intent fields directly:
 
 ```
-// Before:
+// Verbose:
 @access { intent: { purpose: "geo_segmentation", operation: "read" } }
 
-// After:
+// Shorthand:
 @access { purpose: "geo_segmentation", operation: "read" }
 ```
 
 The compiler recognizes intent fields (purpose, basis, operation,
 urgency) and scope fields (scope, resources) and routes them to the
-correct sub-structure. If there's ambiguity, use the full form.
+correct sub-structure.
 
 ---
 
@@ -142,19 +119,6 @@ correct sub-structure. If there's ambiguity, use the full form.
 }
 ```
 
-**9 lines. ~142 tokens.** Same panel in verbose form: see
-[expression-shorthand.md §11](expression-shorthand.md). With context
-inheritance: see [config-inheritance.md §2](config-inheritance.md).
-
----
-
-## Comparison
-
-**9 lines, ~142 tokens** — 17% more compact than v0.3 while carrying
-access control, typed credentials, expression pushdown, and GDPR
-compliance. Full token budget comparison: see
-[config-inheritance.md §10](config-inheritance.md).
-
 ---
 
 ## Backward Compatibility
@@ -169,8 +133,7 @@ f = filter { predicate: ... }    // implicit chain from previous rod
 ```
 
 The compiler normalizes all forms to the same AST. The compiled
-manifest always uses the fully qualified form (with `cfg.`, `arg.`,
-explicit snaps) for audit and certification.
+manifest always uses the fully qualified form for audit and certification.
 
 ---
 
@@ -201,10 +164,8 @@ explicit snaps) for audit and certification.
    panel author controls the chain by ordering rod declarations. The
    compiler validates that the resulting graph is acyclic.
 
-8. **`from:` namespace resolution.** When `from: rod.knot` is specified,
-   `rod` resolves against rod names declared in the same panel. The
-   `knot` segment resolves against the named output knot of that rod type
-   (e.g., `out.match`, `out.rows`). If `rod` is not found in the current
-   panel, the compiler MUST emit an error — cross-panel references are
-   not allowed in `from:` clauses. The `from: [rod1, rod2]` multi-input
-   form applies the same resolution to both names independently.
+8. **`from:` namespace resolution.** `rod` resolves against rod names
+   declared in the same panel. `knot` resolves against the named output
+   knot of that rod type (e.g., `out.match`, `out.rows`). Cross-panel
+   references are not allowed — compiler MUST emit an error. The
+   `from: [rod1, rod2]` form applies the same resolution independently.
