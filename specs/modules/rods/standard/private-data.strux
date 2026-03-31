@@ -1,0 +1,91 @@
+// OpenStrux — private-data standard rod definition
+// Normative for v0.6.
+//
+// This file defines the knot signature of the private-data standard rod.
+// Expansion rules are in specs/core/semantics.md §Standard Rod Expansion.
+// Compliance behavior is in specs/modules/rods/standard/private-data-gdpr.md
+// and specs/modules/rods/standard/private-data-bdsg.md.
+
+// ─────────────────────────────────────────────
+// Rod: private-data
+// Category: Standard (Privacy)
+// Expands to: validate → pseudonymize → [encrypt] → guard
+// ─────────────────────────────────────────────
+
+@rod private-data {
+
+  // ── Configuration knots (resolved at compile time) ──────────
+
+  // framework: Which privacy law governs this data flow.
+  // Type-path resolution: gdpr → GdprBaseConfig, gdpr.bdsg → BdsgConfig.
+  // Inherited from @privacy context block if not specified.
+  cfg.framework: PrivacyFramework
+
+  // fields: Per-field classification for pseudonymization + encryption scope.
+  // Optional when input is PrivateData<T> — classifications derived from the wrapper.
+  // Explicit cfg.fields overrides embedded PrivateData<T> classifications.
+  cfg.fields: Optional<Batch<FieldClassification>>
+
+  // purpose: Processing purpose, human-readable. Required for GDPR (Art. 5(1)(b)).
+  // Inherited from PrivateData<T>.processing.purpose if not specified.
+  cfg.purpose: string
+
+  // retention: How long data is stored and on what legal basis.
+  // Required for GDPR (Art. 5(1)(e)). Inherited from context @privacy block if not specified.
+  cfg.retention: RetentionPolicy
+
+  // encryption_required: Whether the encrypt rod is included in the expansion.
+  // Default: false for gdpr base; true for gdpr.bdsg (always).
+  // Forced to true when any field has sensitivity: special_category or highly_sensitive.
+  cfg.encryption_required: bool = false
+
+  // ── Argument knots (resolved at compile time, may use expressions) ──
+
+  // predicate: Optional data-minimization filter. Applied before pseudonymization.
+  // Same syntax as filter arg.predicate.
+  arg.predicate: Optional<string>
+
+  // ── Input knots ──────────────────────────────────────────────
+
+  // data: The personal data to process. May be raw T or PrivateData<T>.
+  // Default input knot (used for implicit chaining).
+  in.data: Single<T> | Stream<T>
+
+  // ── Output knots ─────────────────────────────────────────────
+
+  // protected: The processed data after pseudonymization and optional encryption.
+  // Default output knot (used for implicit chaining).
+  out.protected: T
+
+  // audit: Privacy processing audit record. Includes which fields were masked,
+  // which were encrypted, the lawful basis applied, and the expansion hash.
+  out.audit: PrivacyAuditRecord
+
+  // ── Error knots ──────────────────────────────────────────────
+
+  // denied: Access denied by the expanded guard rod.
+  err.denied: ErrorKnot
+
+  // invalid: Data failed the expanded validate rod's schema check.
+  err.invalid: ErrorKnot
+
+  // policy_violation: Framework-specific policy violation.
+  // Examples: missing lawful basis, invalid basis for special category data,
+  // employee_category missing under BDSG when employee_data: true.
+  err.policy_violation: ErrorKnot
+}
+
+// ─────────────────────────────────────────────
+// Auxiliary output type
+// ─────────────────────────────────────────────
+
+@type PrivacyAuditRecord {
+  rod_id:          string,           // rod name in the panel
+  framework:       string,           // "gdpr" | "gdpr.bdsg"
+  purpose:         string,
+  pseudonymized:   Batch<string>,    // field names that were masked
+  encrypted:       Batch<string>,    // field names that were encrypted
+  lawful_basis:    string,           // value from framework config
+  expansion_hash:  string,           // sha256 of expansion config (from lock)
+  ts:              date
+}

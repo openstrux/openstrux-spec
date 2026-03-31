@@ -100,7 +100,8 @@ rod_type      = "read-data" | "write-data"
               | "merge" | "join" | "window"
               | "guard" | "store"
               | "validate" | "pseudonymize" | "encrypt"
-              | "split" ;
+              | "split"
+              | "private-data" ;           (* standard rod — v0.6 *)
 
 rod_body      = { rod_member } ;
 rod_member    = knot_assign | snap_stmt | from_clause ;
@@ -155,8 +156,27 @@ sec_block     = "@sec" "{" kv_pairs "}" ;
 ```ebnf
 cert_block    = "@cert" "{" kv_pairs "}" ;
 
+privacy_block = "@privacy" "{" kv_pairs "}" ;
+(* @privacy is a panel-level decorator that declares the governing privacy framework.
+   It is inheritable from strux.context; panels can narrow but not widen the framework.
+   Syntax example: @privacy { framework: gdpr, dpa_ref: "DPA-2026-001" }           *)
+
 (* @dp, @access, @ops, @sec defined above *)
 (* @cert is never inherited — per-component only *)
+(* @privacy is inherited from strux.context; panels can narrow the framework *)
+```
+
+Panel body updated to accept `@privacy`:
+
+```ebnf
+panel_member  = dp_block | access_block | privacy_block | rod_def | snap_stmt ;
+```
+
+Context body updated to accept `@privacy`:
+
+```ebnf
+context_member = dp_block | access_block | ops_block | sec_block | privacy_block
+               | source_def | target_def ;
 ```
 
 ---

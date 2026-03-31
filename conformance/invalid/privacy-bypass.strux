@@ -1,0 +1,23 @@
+// Conformance fixture: panel with @privacy but a data path that bypasses private-data rod
+// Expected diagnostic: E_PRIVACY_PATH_BYPASS
+// The path receive → transform → write-data has no private-data rod,
+// violating the @privacy { framework: gdpr } declaration.
+
+@panel privacy-bypass-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @privacy { framework: gdpr }
+  @access { purpose: "demo", basis: "contract", operation: "write" }
+
+  recv = receive {
+    trigger: http { method: POST, path: "/intake" }
+  }
+  t = transform {
+    // Personal data is transformed here but never passes through private-data.
+    // @privacy requires all source→sink paths to include private-data.
+    fields: [id, email, name]  // email and name are personal data — no protection applied
+  }
+  sink = write-data {
+    target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "out", tls: true }
+  }
+  // Diagnostic expected: E_PRIVACY_PATH_BYPASS on path recv → t → sink
+}

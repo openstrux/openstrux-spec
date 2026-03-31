@@ -608,6 +608,75 @@ via split + snaps, not via a special rod.
 
 ---
 
+---
+
+## Rod Taxonomy
+
+OpenStrux defines three rod categories:
+
+| Category | Count | Defined in | Certified by | Composition |
+|---|---|---|---|---|
+| **Basic** | 18 | `specs/modules/rods/` | Project | Atomic — cannot be decomposed |
+| **Standard** | N (starts at 1) | `specs/modules/rods/standard/` | Project | Composite — expands to basic rods |
+| **Hub** | Community-defined | Hub registry | Community | Composite or adapter-specific |
+
+Standard rods ship with core, carry project-level certification, and are expanded into basic rod
+sub-graphs during IR lowering. They cannot be overridden or monkey-patched by panel authors.
+
+---
+
+## Standard Rods
+
+### `private-data` — Privacy-safe personal data processing
+
+**Category:** Privacy
+**Framework:** GDPR (Art. 5, 6, 9, 25, 30) + BDSG (§26, §38)
+**Expands to:** `validate → pseudonymize → [encrypt] → guard`
+
+| Knot | Direction | Type | Notes |
+|---|---|---|---|
+| `framework` | cfg | `PrivacyFramework` | Which privacy law governs the flow |
+| `fields` | cfg | `Batch<FieldClassification>` | Field classifications (optional if input is `PrivateData<T>`) |
+| `purpose` | cfg | `string` | Processing purpose (maps to Art. 30) |
+| `retention` | cfg | `RetentionPolicy` | Retention period and basis |
+| `encryption_required` | cfg | `bool` | Include encrypt rod in expansion (framework-dependent default) |
+| `predicate` | arg | `Optional<string>` | Additional data-minimization filter |
+| `data` | in | `Single<T>` or `Stream<T>` | Personal data to process |
+| `protected` | out | `T` | Processed data (pseudonymized/encrypted) |
+| `audit` | out | `PrivacyAuditRecord` | Privacy processing audit record |
+| `denied` | err | `ErrorKnot` | Access denied by privacy guard |
+| `invalid` | err | `ErrorKnot` | Data failed schema validation |
+| `policy_violation` | err | `ErrorKnot` | Framework-specific policy violation |
+
+**Default knots:** `in.data` / `out.protected` (follows implicit chaining).
+
+**Expansion rules:**
+
+| Framework | Expanded sub-graph |
+|---|---|
+| `gdpr` (base), `encryption_required: false` | `validate → pseudonymize → guard` |
+| `gdpr` (base), `encryption_required: true` | `validate → pseudonymize → encrypt → guard` |
+| `gdpr.bdsg`, any | `validate → pseudonymize → encrypt → guard` (encryption always required) |
+
+Special category fields (`sensitivity: special_category` or `highly_sensitive`) force `encryption_required`
+to `true` regardless of explicit config.
+
+**Compliance mappings:**
+
+| Compliance requirement | How `private-data` satisfies it |
+|---|---|
+| GDPR Art. 5 (purpose, minimization, storage limitation) | `purpose` + `predicate` + `retention` required at compile time |
+| GDPR Art. 6 (lawful basis) | `framework.lawful_basis` required; validated against declared purpose |
+| GDPR Art. 9 (special categories) | Detected via `Sensitivity.special_category`; restricts `lawful_basis` options |
+| GDPR Art. 25 (data protection by design) | Auto-pseudonymizes all `identifying`/`quasi_identifying` fields |
+| GDPR Art. 30 (records of processing) | `privacyRecords` manifest entry generated for every instance |
+| BDSG §26 (employee data) | Requires `employee_category`; elevates all fields to `special_category` |
+| BDSG §38 (mandatory DPO) | `dataProtectionOfficer` required in manifest when `employee_data: true` |
+
+Full normative definition: [specs/modules/rods/standard/private-data.strux](standard/private-data.strux)
+
+---
+
 ## Summary: 18 Basic Rods
 
 | # | Rod | Category | New? | Maps to |

@@ -1,0 +1,24 @@
+// Conformance fixture: private-data rod missing required cfg.fields when input is not PrivateData<T>
+// Expected diagnostic: E_MISSING_REQUIRED_KNOT — cfg.fields is required when input is not PrivateData<T>
+
+@panel missing-fields-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "demo", basis: "contract", operation: "read" }
+
+  src = read-data {
+    source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users", tls: true }
+    mode: "scan"
+  }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            contract,
+      data_subject_categories: ["user"]
+    }
+    // MISSING: cfg.fields — required when input is not PrivateData<T>
+    purpose:   "demo"
+    retention: { duration: "1y", basis: contract_duration }
+  }
+  sink = write-data {
+    target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "out", tls: true }
+  }
+}

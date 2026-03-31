@@ -1,0 +1,24 @@
+// Standard type: PersonName
+// Classification: given_name/family_name/middle_name → identifying/standard
+//                prefix/suffix → quasi_identifying/standard
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type PersonName @sealed {
+  given_name:          string,           // identifying, standard
+  family_name:         string,           // identifying, standard
+  second_family_name:  Optional<string>, // identifying, standard — segundo apellido (Spanish dual-surname convention; also used in Portuguese, Catalan, Basque, and some Latin American contexts)
+  middle_name:         Optional<string>, // identifying, standard
+  prefix:              Optional<string>, // quasi_identifying, standard
+  suffix:              Optional<string>  // quasi_identifying, standard
+}
+
+// Built-in field classifications (enforced by compiler, not stored as runtime data):
+//   given_name:         { category: identifying,       sensitivity: standard }
+//   family_name:        { category: identifying,       sensitivity: standard }
+//   second_family_name: { category: identifying,       sensitivity: standard }
+//   middle_name:        { category: identifying,       sensitivity: standard }
+//   prefix:             { category: quasi_identifying, sensitivity: standard }
+//   suffix:             { category: quasi_identifying, sensitivity: standard }
+//
+// GDPR base pseudonymization scope: given_name, family_name, second_family_name, middle_name (identifying)
+// GDPR+BDSG pseudonymization scope: all fields including prefix, suffix (quasi_identifying too)

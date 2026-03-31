@@ -1,0 +1,26 @@
+// Standard type: FinancialAccount
+// Classification: iban/account_holder → financial/identifying
+//                bic/bank_name → financial/quasi_identifying
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type FinancialAccount @sealed {
+  iban:            Optional<string>, // financial, identifying
+  bic:             Optional<string>, // financial, quasi_identifying
+  account_holder:  string,           // identifying, standard
+  bank_name:       Optional<string>  // quasi_identifying, standard
+}
+
+// Built-in field classifications:
+//   iban:           { category: financial,         sensitivity: standard }
+//   bic:            { category: financial,         sensitivity: standard }
+//   account_holder: { category: identifying,       sensitivity: standard }
+//   bank_name:      { category: quasi_identifying, sensitivity: standard }
+//
+// Note: iban and bic carry category: financial. This means:
+//   - They are always pseudonymized (financial is in the always-pseudonymize set)
+//   - They appear in Art. 30 personalDataCategories as "financial"
+//   - They do not trigger Art. 9 special category rules (financial is not a special
+//     category under GDPR Art. 9 unless in an employment context under BDSG §26)
+//
+// GDPR base pseudonymization scope: iban, account_holder (financial + identifying)
+// GDPR+BDSG pseudonymization scope: all fields (bic, bank_name also included as quasi_identifying)

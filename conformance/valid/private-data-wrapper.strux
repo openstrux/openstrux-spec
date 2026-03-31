@@ -1,0 +1,34 @@
+// Conformance fixture: PrivateData<T> wrapper type flowing through private-data rod
+// Expected: parses and typechecks cleanly.
+// The private-data rod receives PrivateData<T> and derives cfg.fields from the wrapper.
+
+@panel wrapper-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @privacy { framework: gdpr }
+  @access { purpose: "applicant_intake", basis: "contract", operation: "write" }
+
+  recv = receive {
+    trigger: http { method: POST, path: "/apply" }
+  }
+  // Input is PrivateData<UserIdentity> — classifications are embedded in the wrapper.
+  // cfg.fields is omitted; the rod derives field scope from PrivateData<T>.classification.
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            contract,
+      data_subject_categories: ["applicant"]
+    }
+    // cfg.fields omitted — derived from PrivateData<UserIdentity>.classification
+    purpose:   "grant applicant intake"
+    retention: { duration: "5y", basis: legal_obligation }
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host:    env("DB_HOST")
+      port:    5432
+      db_name: "applicants"
+      tls:     true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/pg" }
+    }
+  }
+  resp = respond { status: 201 }
+}

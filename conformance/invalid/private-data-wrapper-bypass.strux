@@ -1,0 +1,20 @@
+// Conformance fixture: PrivateData<T> bypasses private-data rod and flows to a sink
+// Expected diagnostic: E_PRIVATE_DATA_SINK_BYPASS
+// PrivateData<T> must pass through a private-data rod before reaching write-data or respond.
+
+@panel wrapper-bypass-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "demo", basis: "contract", operation: "write" }
+
+  recv = receive {
+    trigger: http { method: POST, path: "/apply" }
+    // Output is PrivateData<UserIdentity>
+  }
+  // PrivateData<UserIdentity> flows directly to write-data with no private-data rod.
+  // This is a compile error: PrivateData<T> must flow through private-data before a sink.
+  sink = write-data {
+    target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "applicants", tls: true }
+  }
+  // Diagnostic expected: E_PRIVATE_DATA_SINK_BYPASS
+  // PrivateData<UserIdentity> reaches write-data without passing through private-data rod.
+}

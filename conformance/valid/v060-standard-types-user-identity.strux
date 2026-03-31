@@ -1,0 +1,29 @@
+// Conformance fixture: UserIdentity standard type with private-data rod
+// Expected: parses and typechecks cleanly.
+// The private-data rod auto-derives field classifications from UserIdentity.
+// national_id (highly_sensitive) forces encryption_required to true.
+
+@panel user-identity-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de", record: "RPA-2026-010" }
+  @privacy { framework: gdpr }
+  @access { purpose: "user_registration", basis: "contract", operation: "write" }
+
+  recv = receive { trigger: http { method: POST, path: "/register" } }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            contract,
+      data_subject_categories: ["user"]
+    }
+    // No cfg.fields needed — UserIdentity carries built-in classifications.
+    // national_id (highly_sensitive) automatically forces encryption_required: true.
+    purpose:   "user account registration"
+    retention: { duration: "3y", basis: contract_duration }
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host: env("DB_HOST"), port: 5432, db_name: "users", tls: true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/pg" }
+    }
+  }
+  resp = respond { status: 201 }
+}

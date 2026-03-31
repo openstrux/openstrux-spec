@@ -1,0 +1,26 @@
+// Conformance fixture: BdsgConfig, EmployeeCategory
+// Expected: parses and typechecks cleanly.
+
+@panel bdsg-employee-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "employee-record-processing", basis: "legal_obligation", operation: "read" }
+
+  src = read-data { source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "hr", tls: true } }
+  pd = private-data {
+    framework: gdpr.bdsg {
+      lawful_basis:             legal_obligation,
+      data_subject_categories:  ["employee"],
+      employee_data:            true,
+      employee_category:        employee,
+      betriebsrat_consent:      "BR-2026-003"
+    }
+    fields: [
+      { field: "name",        category: identifying,       sensitivity: standard },
+      { field: "salary",      category: financial,         sensitivity: special_category },
+      { field: "department",  category: quasi_identifying, sensitivity: standard }
+    ]
+    purpose: "employee payroll processing"
+    retention: { duration: "10y", basis: legal_obligation }
+  }
+  sink = write-data { target: db.sql.postgres { host: env("PAYROLL_HOST"), port: 5432, db_name: "payroll_out", tls: true } }
+}

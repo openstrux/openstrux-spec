@@ -1,0 +1,54 @@
+{
+  "__fixture": "Expected manifest output for conformance/valid/private-data-gdpr.strux",
+  "__note": "privacyRecords field is the addition under this change. All other fields follow existing manifest schema.",
+  "schemaVersion": "0.6",
+  "panel": "grant-intake",
+  "dp": {
+    "controller": "Acme GmbH",
+    "controllerId": "DE-HRB123456",
+    "dpo": "dpo@acme.de",
+    "record": "RPA-2026-001"
+  },
+  "access": {
+    "intent": { "purpose": "grant_intake", "basis": "contract", "operation": "write" },
+    "scope": "default-read"
+  },
+  "privacyRecords": [
+    {
+      "rodId": "pd",
+      "framework": "gdpr",
+      "article30": {
+        "controller": "Acme GmbH",
+        "controllerId": "DE-HRB123456",
+        "dpo": "dpo@acme.de",
+        "record": "RPA-2026-001",
+        "purpose": "grant application intake",
+        "lawfulBasis": "contract",
+        "dataSubjectCategories": ["applicant"],
+        "personalDataCategories": ["identifying", "quasi_identifying"],
+        "specialCategories": [],
+        "recipients": [
+          {
+            "type": "db.sql.postgres",
+            "db_name": "grants"
+          }
+        ],
+        "retention": {
+          "duration": "5y",
+          "basis": "legal_obligation",
+          "reviewCycle": null
+        },
+        "technicalMeasures": ["pseudonymization"],
+        "dpiaRef": null,
+        "crossBorderTransfer": null
+      },
+      "expansionHash": "__EXPANSION_HASH__",
+      "fields": [
+        { "field": "email",       "category": "identifying",       "sensitivity": "standard" },
+        { "field": "family_name", "category": "identifying",       "sensitivity": "standard" },
+        { "field": "given_name",  "category": "identifying",       "sensitivity": "standard" },
+        { "field": "postal_code", "category": "quasi_identifying", "sensitivity": "standard" }
+      ]
+    }
+  ]
+}

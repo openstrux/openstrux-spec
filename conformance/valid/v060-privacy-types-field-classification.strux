@@ -1,0 +1,30 @@
+// Conformance fixture: FieldClassification, DataCategory, Sensitivity
+// Expected: parses and typechecks cleanly.
+
+@type UserDataFields {
+  email:        FieldClassification,  // identifying, standard
+  zip_code:     FieldClassification,  // quasi_identifying, standard
+  health_status: FieldClassification  // health, special_category
+}
+
+// Inline use: batch of classifications
+@panel classify-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "demo", basis: "contract", operation: "read" }
+
+  src = read-data { source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users", tls: true } }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis: contract,
+      data_subject_categories: ["employee"]
+    }
+    fields: [
+      { field: "email",         category: identifying,       sensitivity: standard },
+      { field: "zip_code",      category: quasi_identifying, sensitivity: standard },
+      { field: "health_status", category: health,            sensitivity: special_category }
+    ]
+    purpose: "employee record classification demo"
+    retention: { duration: "5y", basis: legal_obligation }
+  }
+  sink = write-data { target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users_out", tls: true } }
+}

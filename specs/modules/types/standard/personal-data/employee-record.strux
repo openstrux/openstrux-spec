@@ -1,0 +1,36 @@
+// Standard type: EmployeeRecord
+// Composite: UserIdentity + employment fields
+// Classification: employee_id → identifying/standard
+//                department/position/hire_date/manager_id → quasi_identifying/standard
+//                salary → financial/special_category (triggers Art. 9 rules)
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type EmployeeRecord @sealed {
+  identity:    UserIdentity,
+  employee_id: string,            // identifying, standard
+  department:  string,            // quasi_identifying, standard
+  position:    string,            // quasi_identifying, standard
+  hire_date:   date,              // quasi_identifying, standard
+  salary:      Optional<number>,  // financial, special_category
+  manager_id:  Optional<string>   // quasi_identifying, standard
+}
+
+// Built-in field classifications for EmployeeRecord's own fields:
+//   employee_id: { category: identifying,       sensitivity: standard }
+//   department:  { category: quasi_identifying, sensitivity: standard }
+//   position:    { category: quasi_identifying, sensitivity: standard }
+//   hire_date:   { category: quasi_identifying, sensitivity: standard }
+//   salary:      { category: financial,         sensitivity: special_category }
+//   manager_id:  { category: quasi_identifying, sensitivity: standard }
+//
+// Plus all classifications propagated from UserIdentity (see user-identity.strux).
+//
+// IMPORTANT: salary has sensitivity: special_category (Art. 9 applies to financial data
+// in employment context per GDPR Recital 75 and BDSG §26 interpretation).
+// This forces encryption_required to true and restricts lawful_basis to:
+//   consent, legal_obligation, vital_interests
+// when EmployeeRecord is used with a GDPR framework.
+//
+// Under framework: gdpr.bdsg with employee_data: true, ALL identifying and quasi_identifying
+// fields are elevated to special_category per BDSG §26 — this is in addition to salary
+// already being special_category.

@@ -15,10 +15,12 @@ design, human-translatable, structure-first, trust built in.
 @type Name { field: Type, field2: Type }                    // record
 @type Name = enum { val1, val2, val3 }                      // enum
 @type Name = union { tag1: Type1, tag2: Type2 }             // union
+@type Name @sealed { field: Type }                          // sealed record (standard types only)
 ```
 
 Primitives: `string`, `number`, `bool`, `date`, `bytes`.
 Containers: `Optional<T>`, `Batch<T>`, `Map<K,V>`, `Single<T>`, `Stream<T>`.
+Generic built-in: `PrivateData<T>` — personal data wrapper (see §Privacy).
 Constraint: `number [0..100]`, `string ["a","b","c"]`.
 
 ## Type Paths
@@ -33,6 +35,7 @@ Shorthand (recommended for authoring):
 ```
 @panel name {
   @dp { record }                                      // inherits controller etc. from strux.context
+  @privacy { framework: gdpr }                         // optional: declare governing privacy framework
   @access { purpose, operation }                       // inherits basis, scope from context
   name = rod-type { key: val, key2: val2 }             // implicit chain: reads from previous rod
   name2 = rod-type { key: val, from: other.knot }      // explicit: reads from non-default output
@@ -140,6 +143,110 @@ SchemaRef: `@type` reference or named schema from context (e.g., `schema: UserPa
 
 `window → group → aggregate` chains without explicit wiring (`windowed` is compatible with `group.in.data` and `aggregate.in.grouped`).
 
+## Standard Rods
+
+Standard rods compose basic rods. They ship with core, carry project certification, and expand
+to a basic rod sub-graph during IR lowering.
+
+### `private-data` — Privacy-safe personal data processing
+
+```
+pd = private-data {
+  framework:            gdpr { lawful_basis: contract, data_subject_categories: ["user"] }
+  fields:               [{ field: "email", category: identifying, sensitivity: standard }, ...]
+  purpose:              "grant application intake"
+  retention:            { duration: "5y", basis: legal_obligation }
+  encryption_required:  false                   // true forced when special_category/highly_sensitive present
+  predicate:            "status == 'active'"    // optional data-minimization filter
+}
+```
+
+**Knots:** `in.data` (default) → `out.protected` (default) + `out.audit`. Errors: `err.denied`, `err.invalid`, `err.policy_violation`.
+
+**Expands to:**
+- `gdpr` base: `validate → pseudonymize → guard` (+ `encrypt` if `encryption_required: true` or special_category fields)
+- `gdpr.bdsg`: always `validate → pseudonymize → encrypt → guard` (keyed HMAC, all quasi_identifying masked)
+
+**`cfg.fields` optional** when input is `PrivateData<T>` — classifications derived from the wrapper.
+
+**Framework type paths:** `gdpr` → `GdprBaseConfig`, `gdpr.bdsg` → `BdsgConfig`.
+
+**GdprBaseConfig required fields:** `lawful_basis` (enum: `consent, contract, legal_obligation, vital_interests, public_task, legitimate_interest`), `data_subject_categories`.
+
+**BdsgConfig additional fields:** `employee_data: bool`, `employee_category` (required when `employee_data: true`), `betriebsrat_consent` (optional).
+
+**Compile-time enforcement (GDPR):**
+- `purpose` required (Art. 5(1)(b))
+- `retention` required (Art. 5(1)(e))
+- `lawful_basis` restricted to `consent/legal_obligation/vital_interests` for `special_category` / `highly_sensitive` fields (Art. 9)
+- All `identifying` fields auto-pseudonymized; `special_category` + `highly_sensitive` fields auto-encrypted
+
+**Manifest output:** `privacyRecords` array entry (Art. 30 record) per rod instance.
+
+---
+
+## `@privacy` Decorator
+
+Declares the governing privacy framework at panel or context level.
+
+```
+@privacy { framework: gdpr, dpa_ref: "DPA-2026-001" }    // panel or context
+```
+
+When declared, the validator enforces: every source→sink data flow path must pass through a
+`private-data` rod with a compatible framework. Paths that bypass `private-data` are a compile
+error (`E_PRIVACY_PATH_BYPASS`).
+
+Inheritable from `strux.context`. Framework can narrow (e.g., `gdpr` → `gdpr.bdsg`) but not widen.
+
+---
+
+## `PrivateData<T>` Type
+
+Marks a data value as personal data at the type level, carrying field classifications and
+processing metadata alongside the data.
+
+```
+// In rod knot declarations:
+in.data: PrivateData<UserIdentity>
+
+// Inline construction (when available from receive):
+PrivateData<T> {
+  data:           <T value>,
+  classification: [...],
+  processing:     { purpose: "...", basis: "...", retention: {...} }
+}
+```
+
+**Enforcement:** `PrivateData<T>` reaching `write-data` or `respond` without passing through
+`private-data` is a compile error (`E_PRIVATE_DATA_SINK_BYPASS`).
+
+**Auto-classify:** When `T` is a standard type (`PersonalContact`, `UserIdentity`, etc.), the
+wrapper's `classification` is automatically populated from the type's built-in classifications.
+
+---
+
+## Standard Personal Data Types
+
+Pre-classified types available without import. Field classifications are built-in.
+
+| Type | Key fields (category/sensitivity) |
+|---|---|
+| `PersonName` | `given_name`, `family_name`, `second_family_name`, `middle_name` → identifying/std; `prefix`, `suffix` → quasi/std |
+| `PersonalContact` | `email`, `phone`, `mobile` → identifying/std; `preferred_channel` → non-personal |
+| `PostalAddress` | `street` → identifying/std; `city`, `state`, `postal_code`, `country` → quasi/std |
+| `UserIdentity` | PersonName + PersonalContact + `date_of_birth` (identifying/std) + `national_id` (identifying/**highly_sensitive** → forces encryption) |
+| `EmployeeRecord` | UserIdentity + `employee_id` (identifying) + `department/position/hire_date/manager_id` (quasi) + `salary` (**financial/special_category** → Art. 9) |
+| `FinancialAccount` | `iban` (financial/identifying) + `account_holder` (identifying) + `bic/bank_name` (quasi) |
+
+Sealed: cannot be redefined. Compose with custom fields:
+```
+@type GrantApplicant { identity: UserIdentity, proposal_ref: string }
+// proposal_ref requires explicit cfg.fields entry if it contains personal data
+```
+
+---
+
 ## Data Union Trees
 
 ```
@@ -233,11 +340,12 @@ Portable expressions push to any source. Prefixed push only to matching source (
 ## Decorators
 
 ```
-@dp { controller, controller_id, dpo, record, basis?, fields? }
-@sec { encryption?, classification?, audit? }
-@ops { retry?, timeout?, circuit_breaker?, rate_limit?, fallback? }
-@cert { scope: { source: "db.sql.postgres" }, hash, version }
-@access { intent: { purpose, basis, operation }, scope: policy("name") }
+@dp      { controller, controller_id, dpo, record, basis?, fields? }
+@privacy { framework: gdpr | gdpr.bdsg, dpa_ref? }
+@sec     { encryption?, classification?, audit? }
+@ops     { retry?, timeout?, circuit_breaker?, rate_limit?, fallback? }
+@cert    { scope: { source: "db.sql.postgres" }, hash, version }
+@access  { intent: { purpose, basis, operation }, scope: policy("name") }
 ```
 
 `@ops` field types:
@@ -280,6 +388,7 @@ project-root/
 | Block | Inheritable | Merge behavior |
 |-------|------------|----------------|
 | `@dp` | Yes | Field-level merge, panel wins |
+| `@privacy` | Yes | Framework can **narrow** (e.g., `gdpr` → `gdpr.bdsg`); panel wins on `dpa_ref` |
 | `@access` | Yes | Panel can **narrow** scope, never widen (compile error) |
 | `@source` | Yes (by `@name`) | `cfg.source = @production` references named source; inline fields override |
 | `@target` | Yes (by `@name`) | Same as @source |

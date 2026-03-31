@@ -172,6 +172,74 @@ Specifically:
 
 See [locks.md](locks.md) for how the lock file guarantees reproducibility.
 
+## Standard Rod Expansion (IR Lowering)
+
+Standard rods are expanded into sub-graphs of basic rods during IR lowering, before the IR is
+handed to an emitter. This section defines the normative expansion model.
+
+### When expansion occurs
+
+After the panel's snap graph is resolved and all `cfg` knots are narrowed (type paths resolved),
+the compiler replaces each standard rod node with its expansion sub-graph. The expansion is
+deterministic: same config → same sub-graph → same lock hash.
+
+### Expansion procedure
+
+1. **Identify** all standard rod nodes in the IR snap graph.
+2. **Resolve** the expansion rule by looking up the rod type and narrowed config.
+3. **Replace** the standard rod node with the expansion sub-graph:
+   - The standard rod's `in` knots are wired to the first node in the sub-graph.
+   - The standard rod's `out` knots are wired from the last node in the sub-graph.
+   - Error paths from expansion nodes are wired to the standard rod's `err` knots.
+4. **Record** the expansion hash in the lock file: `sha256(rod_type + sorted_cfg_pairs)`.
+5. **Continue** IR construction with the expanded snap graph (no standard rod nodes remain).
+
+### Expansion rules for `private-data`
+
+The expanded sub-graph depends on the narrowed `framework` config and the field classifications.
+
+**Base expansion (all frameworks):**
+
+```
+in.data
+  → validate   (cfg.schema: derived from fields classification)
+  → pseudonymize (cfg.algo: framework-default, arg.fields: all identifying + quasi_identifying)
+  [→ encrypt   (cfg.key_ref: from context, arg.fields: all special_category + highly_sensitive) — when encryption_required]
+  → guard      (cfg.policy: framework lawful_basis check + access context)
+  → out.protected
+```
+
+**Framework-specific expansion config:**
+
+| Framework | pseudonymize algo default | encryption_required default | quasi_identifying masked? |
+|---|---|---|---|
+| `gdpr` (base) | `sha256` | `false` (unless special_category/highly_sensitive field present) | No (only if `encryption_required` true) |
+| `gdpr.bdsg` | `sha256_hmac` (keyed) | `true` always | Yes (always) |
+
+**Special category override:** If any field has `sensitivity: special_category` or `highly_sensitive`,
+`encryption_required` is forced to `true` regardless of explicit config or framework default.
+
+**BDSG additional constraint:** `pseudonymize` under `gdpr.bdsg` requires a `key_ref` in the
+expansion config. A `sha256_hmac` without a key reference is a compile error.
+
+### Determinism requirement
+
+Two invocations of the compiler with identical `.strux` source + lock file MUST produce identical
+expansion sub-graphs. Specifically:
+- Field order in `cfg.fields` does not affect the expansion (fields are sorted by name before hashing).
+- Framework config field order does not affect the expansion.
+- The expansion hash is stable across compiler versions within the same spec version.
+
+See [locks.md](locks.md) for how expansion hashes are stored in the lock file.
+
+### Certification scope
+
+A `@cert` block on a standard rod covers the **entire expansion sub-graph**. When the manifest
+reports certification for a `private-data` rod, the certification covers `validate`,
+`pseudonymize`, `encrypt` (if present), and `guard` as a unit — not independently.
+
+---
+
 ## What Is NOT Specified Here
 
 - **Target-specific behavior.** How emitted Beam Python code handles

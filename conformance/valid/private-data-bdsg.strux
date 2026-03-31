@@ -1,0 +1,56 @@
+// Conformance fixture: private-data rod with GDPR+BDSG framework
+// Expected: parses and typechecks cleanly; expands to validate → pseudonymize → encrypt → guard.
+// Note: encryption_required is always true under gdpr.bdsg.
+
+@context {
+  @dp {
+    controller:    "Acme GmbH"
+    controller_id: "DE-HRB123456"
+    dpo:           "dpo@acme.de"
+  }
+  @access { intent: { basis: "legal_obligation" }, scope: policy("hr-read") }
+}
+
+@panel employee-payroll {
+  @dp { record: "RPA-2026-007" }
+  @privacy { framework: gdpr.bdsg }
+  @access { purpose: "payroll_processing", operation: "read" }
+
+  src = read-data {
+    source: db.sql.postgres {
+      host:    env("HR_DB_HOST")
+      port:    5432
+      db_name: "hr"
+      tls:     true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/hr-pg" }
+    }
+    mode: "scan"
+  }
+  pd = private-data {
+    framework: gdpr.bdsg {
+      lawful_basis:            legal_obligation,
+      data_subject_categories: ["employee"],
+      employee_data:           true,
+      employee_category:       employee,
+      betriebsrat_consent:     "BR-2026-003"
+    }
+    fields: [
+      { field: "name",       category: identifying,       sensitivity: standard },
+      { field: "salary",     category: financial,         sensitivity: special_category },
+      { field: "department", category: quasi_identifying, sensitivity: standard },
+      { field: "position",   category: quasi_identifying, sensitivity: standard }
+    ]
+    purpose: "payroll processing"
+    retention: { duration: "10y", basis: legal_obligation }
+    // encryption_required defaults to true for gdpr.bdsg
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host:    env("PAYROLL_DB_HOST")
+      port:    5432
+      db_name: "payroll"
+      tls:     true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/payroll-pg" }
+    }
+  }
+}

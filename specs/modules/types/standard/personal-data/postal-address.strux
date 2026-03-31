@@ -1,0 +1,25 @@
+// Standard type: PostalAddress
+// Classification: street → identifying/standard (in combination with other fields)
+//                city/state/postal_code/country → quasi_identifying/standard
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type PostalAddress @sealed {
+  street:      string,           // identifying, standard
+  city:        string,           // quasi_identifying, standard
+  state:       Optional<string>, // quasi_identifying, standard
+  postal_code: string,           // quasi_identifying, standard
+  country:     string            // quasi_identifying, standard
+}
+
+// Built-in field classifications:
+//   street:      { category: identifying,       sensitivity: standard }
+//   city:        { category: quasi_identifying, sensitivity: standard }
+//   state:       { category: quasi_identifying, sensitivity: standard }
+//   postal_code: { category: quasi_identifying, sensitivity: standard }
+//   country:     { category: quasi_identifying, sensitivity: standard }
+//
+// GDPR base pseudonymization scope: street (identifying)
+// GDPR+BDSG pseudonymization scope: all fields (quasi_identifying also covered under BDSG)
+//
+// Note: "street" is classified as identifying because in combination with city/postal_code
+// it uniquely identifies a residential address, satisfying the GDPR Art. 4(1) definition.

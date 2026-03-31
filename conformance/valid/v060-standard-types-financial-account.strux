@@ -1,0 +1,28 @@
+// Conformance fixture: FinancialAccount standard type with private-data GDPR rod
+// Expected: parses and typechecks cleanly.
+// iban (financial, identifying) and account_holder (identifying) pseudonymized automatically.
+
+@panel financial-account-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de", record: "RPA-2026-012" }
+  @privacy { framework: gdpr }
+  @access { purpose: "payment_processing", basis: "contract", operation: "write" }
+
+  recv = receive { trigger: http { method: POST, path: "/payment" } }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            contract,
+      data_subject_categories: ["customer"]
+    }
+    // FinancialAccount built-in classifications: iban → financial/identifying,
+    // account_holder → identifying. Both auto-pseudonymized.
+    purpose:   "payment processing"
+    retention: { duration: "7y", basis: legal_obligation }
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host: env("DB_HOST"), port: 5432, db_name: "payments", tls: true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/pg" }
+    }
+  }
+  resp = respond { status: 201 }
+}

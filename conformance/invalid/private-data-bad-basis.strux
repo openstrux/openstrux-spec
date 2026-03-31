@@ -1,0 +1,29 @@
+// Conformance fixture: private-data rod with invalid lawful basis for special category data
+// Expected diagnostic: E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY
+// Art. 9 special category data requires consent, legal_obligation, or vital_interests —
+// not legitimate_interest.
+
+@panel bad-basis-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "demo", basis: "legitimate_interest", operation: "read" }
+
+  src = read-data {
+    source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users", tls: true }
+    mode: "scan"
+  }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            legitimate_interest,   // INVALID for special category data
+      data_subject_categories: ["patient"]
+    }
+    fields: [
+      { field: "diagnosis", category: health, sensitivity: special_category }
+      // ↑ health + special_category requires consent, legal_obligation, or vital_interests
+    ]
+    purpose: "health screening"
+    retention: { duration: "5y", basis: legal_obligation }
+  }
+  sink = write-data {
+    target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "health_out", tls: true }
+  }
+}

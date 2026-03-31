@@ -1,0 +1,36 @@
+// Conformance fixture: EmployeeRecord standard type with private-data BDSG rod
+// Expected: parses and typechecks cleanly.
+// salary (financial, special_category) and BDSG §26 elevation both trigger encryption.
+
+@panel employee-record-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de", record: "RPA-2026-011" }
+  @privacy { framework: gdpr.bdsg }
+  @access { purpose: "hr_records", basis: "legal_obligation", operation: "read" }
+
+  src = read-data {
+    source: db.sql.postgres {
+      host: env("HR_DB_HOST"), port: 5432, db_name: "hr", tls: true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/hr-pg" }
+    }
+    mode: "scan"
+  }
+  pd = private-data {
+    framework: gdpr.bdsg {
+      lawful_basis:            legal_obligation,
+      data_subject_categories: ["employee"],
+      employee_data:           true,
+      employee_category:       employee,
+      betriebsrat_consent:     "BR-2026-010"
+    }
+    // EmployeeRecord's built-in classifications are used.
+    // salary (special_category) + BDSG §26 elevation together enforce encryption.
+    purpose:   "payroll and HR record processing"
+    retention: { duration: "10y", basis: legal_obligation }
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host: env("PAYROLL_DB_HOST"), port: 5432, db_name: "payroll_secure", tls: true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/payroll-pg" }
+    }
+  }
+}

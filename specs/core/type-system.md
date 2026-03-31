@@ -180,3 +180,171 @@ Stream target paths (`stream.kafka`, `stream.pubsub`, `stream.kinesis`) have req
 ## 7. Grammar
 
 Formal EBNF for type definitions: see [grammar.md §2](grammar.md).
+
+---
+
+## 8. Privacy Type System
+
+The following types support the `private-data` standard rod and the `@privacy` decorator.
+They are defined here as core types, available to any `.strux` project without explicit import.
+
+### FieldClassification, DataCategory, Sensitivity
+
+```
+@type FieldClassification {
+  field:       string,
+  category:    DataCategory,
+  sensitivity: Sensitivity
+}
+
+@type DataCategory = enum {
+  identifying, quasi_identifying, sensitive_special,
+  financial, health, biometric, genetic, political,
+  religious, trade_union, sexual_orientation, criminal
+}
+
+@type Sensitivity = enum { standard, special_category, highly_sensitive }
+```
+
+`FieldClassification` is the unit of privacy tagging. Every field processed by a `private-data`
+rod must have an associated `FieldClassification` — either explicit (in `cfg.fields`) or derived
+from a standard data model's built-in classifications.
+
+**Category → pseudonymization scope:**
+
+| Category | GDPR base | GDPR + BDSG |
+|---|---|---|
+| `identifying` | always | always |
+| `quasi_identifying` | opt-in | always |
+| `financial` | always | always |
+| `health`, `biometric`, `genetic`, `political`, `religious`, `trade_union`, `sexual_orientation`, `criminal`, `sensitive_special` | always | always |
+
+**Sensitivity → encryption trigger:**
+
+| Sensitivity | Effect |
+|---|---|
+| `standard` | No automatic encryption |
+| `special_category` | `encryption_required` defaults to `true` (GDPR Art. 9) |
+| `highly_sensitive` | `encryption_required` forced to `true` |
+
+### RetentionPolicy, RetentionBasis
+
+```
+@type RetentionPolicy {
+  duration:     string,
+  basis:        RetentionBasis,
+  review_cycle: Optional<string>
+}
+
+@type RetentionBasis = enum {
+  legal_obligation, contract_duration, consent_withdrawal,
+  legitimate_interest_review, statutory_period
+}
+```
+
+`RetentionPolicy` is required for all GDPR-framework `private-data` rods (Art. 5(1)(e) storage
+limitation). The `duration` field is a human-readable period string (e.g., `"5y"`, `"90d"`).
+The `review_cycle` is optional and specifies how often the retention decision should be reviewed.
+
+### PrivateData\<T\>, ProcessingMetadata
+
+```
+@type PrivateData<T> {
+  data:           T,
+  classification: Batch<FieldClassification>,
+  processing:     ProcessingMetadata
+}
+
+@type ProcessingMetadata {
+  purpose:      string,
+  basis:        Optional<string>,
+  retention:    Optional<RetentionPolicy>,
+  consent_ref:  Optional<string>
+}
+```
+
+`PrivateData<T>` is the type-level marker for personal data. When a data flow carries
+`PrivateData<T>`, the compiler enforces that it passes through at least one `private-data` rod
+before reaching a `write-data` or `respond` sink (see §Compile-time enforcement below).
+
+The wrapper carries classifications alongside the data, so the `private-data` rod can derive
+pseudonymization scope and encryption requirements without explicit `cfg.fields` when the input
+is typed as `PrivateData<T>`.
+
+**Compile-time enforcement:**
+- `PrivateData<T>` flowing to `write-data` or `respond` without passing through `private-data` → compile error.
+- `cfg.fields` on `private-data` is optional when input is `PrivateData<T>`; explicit `cfg.fields` overrides embedded classifications.
+- `ProcessingMetadata.purpose` and `ProcessingMetadata.retention` are used as defaults for the rod's `purpose` and `retention` knots if those knots are not explicitly set.
+
+**Interaction with standard data models:** When `T` is a standard type (e.g., `PersonalContact`),
+the embedded `classification` is automatically populated from the standard type's built-in field
+classifications. The author need not populate `classification` manually.
+
+---
+
+## 9. Standard Personal Data Models
+
+A set of pre-classified `@type` definitions ships with core at
+`specs/modules/types/standard/personal-data/`. These types are available without explicit import.
+
+### Sealed types
+
+Standard types are annotated `@sealed`. A sealed type:
+- Cannot be redefined in a `.strux` source file (compile error: `E_SEALED_TYPE_REDEFINITION`)
+- Cannot have fields added inline
+- Can be composed into custom types as a field
+
+```
+// ✗ Compile error: PersonalContact is sealed
+@type PersonalContact { email: string, twitter: string }
+
+// ✓ Composition is always allowed
+@type ExtendedContact { base: PersonalContact, linkedin: Optional<string> }
+```
+
+Custom fields added alongside standard types require explicit `FieldClassification` in
+`cfg.fields` if they are personal data.
+
+### Classification propagation through nested types
+
+When a type includes another type as a field, the inner type's field classifications propagate
+to the outer type. The propagation is transitive and follows the full nesting depth.
+
+**Example:** `UserIdentity` includes `PersonName` and `PersonalContact`:
+- The `private-data` rod processing `UserIdentity` sees all classifications from both
+  `PersonName` (given_name → identifying, prefix → quasi_identifying) and
+  `PersonalContact` (email → identifying) plus `UserIdentity`'s own fields.
+
+**Propagation rules:**
+1. Non-personal fields (e.g., `PersonalContact.preferred_channel`) are **not** propagated —
+   they are excluded from privacy processing regardless of nesting.
+2. Classifications are merged from all nested types. If the same field name appears at multiple
+   levels, the innermost declaration wins.
+3. Custom types that compose standard types inherit all standard type classifications. The custom
+   type's own fields require explicit classification in `cfg.fields`.
+
+### Standard type reference
+
+| Type | Key fields | Triggers encryption? |
+|---|---|---|
+| `PersonName` | given_name, family_name, second_family_name, middle_name (identifying); prefix, suffix (quasi) | No |
+| `PersonalContact` | email, phone, mobile (identifying) | No |
+| `PostalAddress` | street (identifying); city, postal_code, country (quasi) | No |
+| `UserIdentity` | PersonName + PersonalContact + date_of_birth (identifying); national_id (identifying, **highly_sensitive**) | Yes — national_id |
+| `EmployeeRecord` | UserIdentity + employee_id (identifying); department, position, hire_date (quasi); salary (**financial, special_category**) | Yes — salary |
+| `FinancialAccount` | iban (financial, identifying); account_holder (identifying); bic, bank_name (quasi) | No |
+
+Full definitions: [specs/modules/types/standard/personal-data/](../modules/types/standard/personal-data/)
+
+---
+
+## 11. Grammar (updated)
+
+Formal EBNF for type definitions including generic forms: see [grammar.md §2](grammar.md).
+Generic type references (e.g., `PrivateData<T>`) follow the container form:
+
+```ebnf
+generic_ref = name "<" type_expr ">" ;
+```
+
+`PrivateData` is a built-in generic. User-defined generics are not supported in v0.6.

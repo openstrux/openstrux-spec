@@ -1,0 +1,12 @@
+// Conformance fixture: attempting to redefine a sealed standard type
+// Expected diagnostic: E_SEALED_TYPE_REDEFINITION
+// PersonalContact is a sealed standard type — it cannot be redefined.
+
+// This should produce: E_SEALED_TYPE_REDEFINITION: PersonalContact is a sealed standard type.
+// Standard types cannot be redefined. To extend, create a new type that composes PersonalContact.
+
+@type PersonalContact {
+  email:   Optional<string>,
+  phone:   Optional<string>,
+  twitter: Optional<string>   // ← adding a field to a sealed type — compile error
+}

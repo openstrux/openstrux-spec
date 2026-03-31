@@ -1,0 +1,84 @@
+// OpenStrux — Privacy Framework Type Tree
+// Normative for v0.6. Follows the DataSource union pattern.
+//
+// Type path resolution:
+//   framework: gdpr        → GdprBaseConfig
+//   framework: gdpr.bdsg   → BdsgConfig (extends GdprBaseConfig)
+//
+// Only `gdpr` and `gdpr.bdsg` are normative in v0.6.
+// `ccpa` and `lgpd` are reserved identifiers for future specialization.
+
+@type PrivacyFramework = union {
+  gdpr: GdprFramework,
+  ccpa: CcpaFramework,   // reserved — not normative in v0.6
+  lgpd: LgpdFramework    // reserved — not normative in v0.6
+}
+
+// GdprFramework: jurisdiction-specific GDPR variants.
+// `base` is the default when `framework: gdpr` is used (no suffix).
+// `bdsg` is selected when `framework: gdpr.bdsg` is used.
+// `lopdgdd` is reserved for Spain — not normative in v0.6.
+
+@type GdprFramework = union {
+  base:     GdprBaseConfig,
+  bdsg:     BdsgConfig,
+  lopdgdd:  LopdgddConfig  // reserved — not normative in v0.6
+}
+
+// ─────────────────────────────────────────────
+// GDPR Base Config
+// ─────────────────────────────────────────────
+
+@type GdprBaseConfig {
+  lawful_basis:             GdprBasis,
+  data_subject_categories:  Batch<string>,
+  dpia_ref:                 Optional<string>,
+  cross_border_transfer:    Optional<CrossBorderTransfer>
+}
+
+@type GdprBasis = enum {
+  consent, contract, legal_obligation,
+  vital_interests, public_task, legitimate_interest
+}
+
+@type CrossBorderTransfer {
+  mechanism:             TransferMechanism,
+  destination_countries: Batch<string>
+}
+
+@type TransferMechanism = enum {
+  adequacy_decision, standard_contractual_clauses,
+  binding_corporate_rules, explicit_consent
+}
+
+// ─────────────────────────────────────────────
+// BDSG Config (German Federal Data Protection Act)
+// Extends GdprBaseConfig with employee-data-specific fields.
+// All GdprBaseConfig fields are required here as well.
+// ─────────────────────────────────────────────
+
+@type BdsgConfig {
+  // Inherited from GdprBaseConfig (must be re-declared for IR resolution)
+  lawful_basis:             GdprBasis,
+  data_subject_categories:  Batch<string>,
+  dpia_ref:                 Optional<string>,
+  cross_border_transfer:    Optional<CrossBorderTransfer>,
+
+  // BDSG-specific extensions (Section 26)
+  employee_data:            bool,
+  betriebsrat_consent:      Optional<string>,   // e.g. "BR-2026-003"
+  employee_category:        Optional<EmployeeCategory>
+  // Required when employee_data = true. Compile error if missing.
+}
+
+@type EmployeeCategory = enum {
+  applicant, employee, former_employee, contractor, trainee
+}
+
+// ─────────────────────────────────────────────
+// Reserved / future frameworks (not normative in v0.6)
+// ─────────────────────────────────────────────
+
+@type CcpaFramework {}    // California Consumer Privacy Act — future
+@type LgpdFramework {}    // Brazilian LGPD — future
+@type LopdgddConfig {}    // Spanish LOPDGDD — future

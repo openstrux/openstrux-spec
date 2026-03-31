@@ -1,0 +1,25 @@
+// Conformance fixture: RetentionPolicy, RetentionBasis
+// Expected: parses and typechecks cleanly.
+
+@panel retention-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "retention-demo", basis: "legal_obligation", operation: "read" }
+
+  src = read-data { source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users", tls: true } }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis: legal_obligation,
+      data_subject_categories: ["data_subject"]
+    }
+    fields: [
+      { field: "email", category: identifying, sensitivity: standard }
+    ]
+    purpose: "legal record retention"
+    retention: {
+      duration:     "10y",
+      basis:        legal_obligation,
+      review_cycle: "1y"
+    }
+  }
+  sink = write-data { target: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "archive", tls: true } }
+}

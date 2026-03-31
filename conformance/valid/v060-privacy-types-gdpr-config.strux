@@ -1,0 +1,27 @@
+// Conformance fixture: GdprBaseConfig, CrossBorderTransfer, TransferMechanism
+// Expected: parses and typechecks cleanly.
+
+@panel gdpr-cross-border-demo {
+  @dp { controller: "Acme GmbH", controller_id: "DE-HRB123", dpo: "dpo@acme.de" }
+  @access { purpose: "cross-border-transfer-demo", basis: "contract", operation: "read" }
+
+  src = read-data { source: db.sql.postgres { host: env("DB_HOST"), port: 5432, db_name: "users", tls: true } }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:             contract,
+      data_subject_categories:  ["employee"],
+      dpia_ref:                 "DPIA-2026-001",
+      cross_border_transfer: {
+        mechanism:             standard_contractual_clauses,
+        destination_countries: ["US", "IN"]
+      }
+    }
+    fields: [
+      { field: "name",  category: identifying, sensitivity: standard },
+      { field: "email", category: identifying, sensitivity: standard }
+    ]
+    purpose: "payroll processing with offshore support"
+    retention: { duration: "5y", basis: contract_duration }
+  }
+  sink = write-data { target: db.sql.postgres { host: env("PAYROLL_HOST"), port: 5432, db_name: "payroll", tls: true } }
+}

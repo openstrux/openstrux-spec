@@ -1,0 +1,60 @@
+{
+  "__fixture": "Expected manifest output for conformance/valid/private-data-bdsg.strux",
+  "__note": "BDSG extends the GDPR Art. 30 record with bdsgSection26, employeeCategory, betriebsratConsent, and dataProtectionOfficer fields.",
+  "schemaVersion": "0.6",
+  "panel": "employee-payroll",
+  "dp": {
+    "controller": "Acme GmbH",
+    "controllerId": "DE-HRB123456",
+    "dpo": "dpo@acme.de",
+    "record": "RPA-2026-007"
+  },
+  "access": {
+    "intent": { "purpose": "payroll_processing", "basis": "legal_obligation", "operation": "read" },
+    "scope": "hr-read"
+  },
+  "privacyRecords": [
+    {
+      "rodId": "pd",
+      "framework": "gdpr.bdsg",
+      "article30": {
+        "controller": "Acme GmbH",
+        "controllerId": "DE-HRB123456",
+        "dpo": "dpo@acme.de",
+        "record": "RPA-2026-007",
+        "purpose": "payroll processing",
+        "lawfulBasis": "legal_obligation",
+        "dataSubjectCategories": ["employee"],
+        "personalDataCategories": ["financial", "identifying", "quasi_identifying"],
+        "specialCategories": ["financial"],
+        "recipients": [
+          {
+            "type": "db.sql.postgres",
+            "db_name": "payroll"
+          }
+        ],
+        "retention": {
+          "duration": "10y",
+          "basis": "legal_obligation",
+          "reviewCycle": null
+        },
+        "technicalMeasures": ["pseudonymization", "encryption"],
+        "dpiaRef": null,
+        "crossBorderTransfer": null
+      },
+      "bdsgExtensions": {
+        "bdsgSection26": true,
+        "employeeCategory": "employee",
+        "betriebsratConsent": "BR-2026-003",
+        "dataProtectionOfficer": "dpo@acme.de"
+      },
+      "expansionHash": "__EXPANSION_HASH__",
+      "fields": [
+        { "field": "department", "category": "quasi_identifying", "sensitivity": "standard",        "bdsgElevated": true },
+        { "field": "name",       "category": "identifying",       "sensitivity": "standard",        "bdsgElevated": true },
+        { "field": "position",   "category": "quasi_identifying", "sensitivity": "standard",        "bdsgElevated": true },
+        { "field": "salary",     "category": "financial",         "sensitivity": "special_category", "bdsgElevated": false }
+      ]
+    }
+  ]
+}

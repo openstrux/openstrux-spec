@@ -1,0 +1,46 @@
+// Conformance fixture: private-data rod with GDPR framework
+// Expected: parses and typechecks cleanly; expands to validate → pseudonymize → guard.
+
+@context {
+  @dp {
+    controller:    "Acme GmbH"
+    controller_id: "DE-HRB123456"
+    dpo:           "dpo@acme.de"
+  }
+  @access { intent: { basis: "contract" }, scope: policy("default-read") }
+}
+
+@panel grant-intake {
+  @dp { record: "RPA-2026-001" }
+  @privacy { framework: gdpr }
+  @access { purpose: "grant_intake", operation: "write" }
+
+  recv = receive {
+    trigger: http { method: POST, path: "/grants/apply" }
+  }
+  pd = private-data {
+    framework: gdpr {
+      lawful_basis:            contract,
+      data_subject_categories: ["applicant"]
+    }
+    fields: [
+      { field: "given_name",  category: identifying,       sensitivity: standard },
+      { field: "family_name", category: identifying,       sensitivity: standard },
+      { field: "email",       category: identifying,       sensitivity: standard },
+      { field: "postal_code", category: quasi_identifying, sensitivity: standard }
+    ]
+    purpose: "grant application intake"
+    retention: { duration: "5y", basis: legal_obligation }
+    encryption_required: false
+  }
+  sink = write-data {
+    target: db.sql.postgres {
+      host:    env("DB_HOST")
+      port:    5432
+      db_name: "grants"
+      tls:     true
+      credentials: secret_ref { provider: gcp_secret_manager, path: "projects/acme/secrets/pg" }
+    }
+  }
+  resp = respond { status: 201 }
+}

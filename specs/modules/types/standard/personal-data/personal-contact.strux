@@ -1,0 +1,20 @@
+// Standard type: PersonalContact
+// Classification: email/phone/mobile → identifying/standard
+//                preferred_channel → non-personal (not classified)
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type PersonalContact @sealed {
+  email:             Optional<string>, // identifying, standard
+  phone:             Optional<string>, // identifying, standard
+  mobile:            Optional<string>, // identifying, standard
+  preferred_channel: Optional<string>  // non-personal — not included in privacy processing
+}
+
+// Built-in field classifications:
+//   email:             { category: identifying, sensitivity: standard }
+//   phone:             { category: identifying, sensitivity: standard }
+//   mobile:            { category: identifying, sensitivity: standard }
+//   preferred_channel: non-personal — excluded from pseudonymization and Art. 30 categories
+//
+// GDPR base pseudonymization scope: email, phone, mobile (all identifying)
+// preferred_channel is never pseudonymized — it carries no personal data.

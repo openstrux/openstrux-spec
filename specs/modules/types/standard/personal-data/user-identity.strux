@@ -1,0 +1,31 @@
+// Standard type: UserIdentity
+// Composite: PersonName + PersonalContact + date_of_birth + national_id
+// Classification: date_of_birth → identifying/standard
+//                national_id → identifying/highly_sensitive (triggers encryption)
+// Sealed: cannot be redefined. Compose into custom types.
+
+@type UserIdentity @sealed {
+  name:           PersonName,
+  contact:        PersonalContact,
+  date_of_birth:  Optional<date>,   // identifying, standard
+  national_id:    Optional<string>  // identifying, highly_sensitive
+}
+
+// Built-in field classifications for UserIdentity's own fields:
+//   date_of_birth: { category: identifying,  sensitivity: standard }
+//   national_id:   { category: identifying,  sensitivity: highly_sensitive }
+//
+// Classification propagation from composed types:
+//   name.given_name, name.family_name, name.middle_name  → identifying, standard
+//   name.prefix, name.suffix                             → quasi_identifying, standard
+//   contact.email, contact.phone, contact.mobile         → identifying, standard
+//   contact.preferred_channel                            → non-personal
+//
+// IMPORTANT: national_id has sensitivity: highly_sensitive.
+// This forces encryption_required to true when UserIdentity is used with any GDPR framework,
+// even if encryption_required is not explicitly set.
+//
+// Art. 30 personalDataCategories when used with private-data:
+//   ["identifying", "quasi_identifying"]
+// Art. 9 specialCategories: [] (national_id is identifying, not special_category)
+// Note: national_id triggers encryption via highly_sensitive, but is not Art. 9 data.
