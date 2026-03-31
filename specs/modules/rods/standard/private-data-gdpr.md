@@ -82,10 +82,12 @@ compiler enforces additional rules:
 1. **Encryption forced:** `encryption_required` is set to `true` regardless of explicit config.
 2. **Lawful basis restricted:** Only `consent`, `legal_obligation`, and `vital_interests` are
    valid bases. Other bases produce:
+
    ```
    E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY: lawful_basis <value> is not permitted for
      special category data under Art. 9(2). Use consent, legal_obligation, or vital_interests.
    ```
+
 3. **Art. 30 record includes special categories:** The manifest entry lists these fields
    separately under `specialCategories`.
 

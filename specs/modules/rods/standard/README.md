@@ -54,6 +54,7 @@ The hash covers the expansion config, not the source text.
 ## Adding a new standard rod
 
 New standard rods require:
+
 1. A spec definition in this directory (`specs/modules/rods/standard/<name>.strux`)
 2. A normative entry in `specs/modules/rods/overview.md`
 3. Expansion rules in `specs/core/semantics.md`

@@ -272,6 +272,7 @@ pseudonymization scope and encryption requirements without explicit `cfg.fields`
 is typed as `PrivateData<T>`.
 
 **Compile-time enforcement:**
+
 - `PrivateData<T>` flowing to `write-data` or `respond` without passing through `private-data` → compile error.
 - `cfg.fields` on `private-data` is optional when input is `PrivateData<T>`; explicit `cfg.fields` overrides embedded classifications.
 - `ProcessingMetadata.purpose` and `ProcessingMetadata.retention` are used as defaults for the rod's `purpose` and `retention` knots if those knots are not explicitly set.
@@ -290,6 +291,7 @@ A set of pre-classified `@type` definitions ships with core at
 ### Sealed types
 
 Standard types are annotated `@sealed`. A sealed type:
+
 - Cannot be redefined in a `.strux` source file (compile error: `E_SEALED_TYPE_REDEFINITION`)
 - Cannot have fields added inline
 - Can be composed into custom types as a field
@@ -311,11 +313,13 @@ When a type includes another type as a field, the inner type's field classificat
 to the outer type. The propagation is transitive and follows the full nesting depth.
 
 **Example:** `UserIdentity` includes `PersonName` and `PersonalContact`:
+
 - The `private-data` rod processing `UserIdentity` sees all classifications from both
   `PersonName` (given_name → identifying, prefix → quasi_identifying) and
   `PersonalContact` (email → identifying) plus `UserIdentity`'s own fields.
 
 **Propagation rules:**
+
 1. Non-personal fields (e.g., `PersonalContact.preferred_channel`) are **not** propagated —
    they are excluded from privacy processing regardless of nesting.
 2. Classifications are merged from all nested types. If the same field name appears at multiple

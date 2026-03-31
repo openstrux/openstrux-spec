@@ -297,6 +297,7 @@ E_PRIVACY_PATH_BYPASS: data flow path from <source> to <sink> in panel <name>
 ### Relationship to `@dp`
 
 `@dp` and `@privacy` are complementary, not alternatives:
+
 - `@dp` declares the controller identity, DPO, and record reference.
 - `@privacy` declares the regulatory framework in force.
 - Both are typically inherited from `strux.context` at project or domain level.

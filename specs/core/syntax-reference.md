@@ -164,6 +164,7 @@ pd = private-data {
 **Knots:** `in.data` (default) → `out.protected` (default) + `out.audit`. Errors: `err.denied`, `err.invalid`, `err.policy_violation`.
 
 **Expands to:**
+
 - `gdpr` base: `validate → pseudonymize → guard` (+ `encrypt` if `encryption_required: true` or special_category fields)
 - `gdpr.bdsg`: always `validate → pseudonymize → encrypt → guard` (keyed HMAC, all quasi_identifying masked)
 
@@ -176,6 +177,7 @@ pd = private-data {
 **BdsgConfig additional fields:** `employee_data: bool`, `employee_category` (required when `employee_data: true`), `betriebsrat_consent` (optional).
 
 **Compile-time enforcement (GDPR):**
+
 - `purpose` required (Art. 5(1)(b))
 - `retention` required (Art. 5(1)(e))
 - `lawful_basis` restricted to `consent/legal_obligation/vital_interests` for `special_category` / `highly_sensitive` fields (Art. 9)
@@ -240,6 +242,7 @@ Pre-classified types available without import. Field classifications are built-i
 | `FinancialAccount` | `iban` (financial/identifying) + `account_holder` (identifying) + `bic/bank_name` (quasi) |
 
 Sealed: cannot be redefined. Compose with custom fields:
+
 ```
 @type GrantApplicant { identity: UserIdentity, proposal_ref: string }
 // proposal_ref requires explicit cfg.fields entry if it contains personal data

@@ -226,6 +226,7 @@ expansion config. A `sha256_hmac` without a key reference is a compile error.
 
 Two invocations of the compiler with identical `.strux` source + lock file MUST produce identical
 expansion sub-graphs. Specifically:
+
 - Field order in `cfg.fields` does not affect the expansion (fields are sorted by name before hashing).
 - Framework config field order does not affect the expansion.
 - The expansion hash is stable across compiler versions within the same spec version.

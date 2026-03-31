@@ -7,6 +7,7 @@ and are available to any `.strux` project without explicit import.
 
 Each type carries built-in `FieldClassification` (category + sensitivity) per field. When used
 with `PrivateData<T>` or a `private-data` rod, the rod automatically knows:
+
 - Which fields to pseudonymize
 - Which fields trigger encryption
 - What categories to record in the Art. 30 manifest entry

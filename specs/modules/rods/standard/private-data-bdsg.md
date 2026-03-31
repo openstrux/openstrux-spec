@@ -65,6 +65,7 @@ When `betriebsrat_consent` is provided, the value is included in the manifest pr
 as `betriebsratConsent`.
 
 **Purpose patterns that trigger the warning:**
+
 - Purpose contains "monitoring", "performance", "evaluation", "tracking", "surveillance",
   "productivity", or "behavior"
 
