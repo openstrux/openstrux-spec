@@ -1,0 +1,39 @@
+// conformance/valid/v030-type-field-annotations.strux
+// Verifies: field-level annotations (@pk, @relation, @default, @unique, @updatedAt,
+//           @column, @ignore), block-level (@@index, @@unique, @@table),
+//           @timestamps decorator, @external modifier, @opaque escape hatch.
+
+@type ReviewStatus = enum { pending, under_review, approved, rejected }
+
+@external @type LegacyOrg { id: string, name: string }
+
+@type Applicant @timestamps {
+  id:       string    @pk
+  email:    string    @unique
+  name:     string
+  orgId:    string
+  org:      LegacyOrg @relation(field: orgId, ref: LegacyOrg.id)
+  @@table("applicants")
+}
+
+@type Proposal @timestamps {
+  id:         string        @pk(default: uuid)
+  title:      string
+  authorId:   string
+  author:     Applicant     @relation(field: authorId, ref: Applicant.id, onDelete: Cascade)
+  status:     ReviewStatus  @default("pending")
+  archived:   bool          @default(false)
+  internalId: string        @column("internal_ref") @ignore
+  @@index([authorId, status])
+  @@unique([title, authorId])
+  @opaque index("idx_proposals_fulltext", [title])
+}
+
+@type ReviewEvent {
+  id:         string    @pk
+  proposalId: string
+  proposal:   Proposal  @relation(field: proposalId, ref: Proposal.id, onDelete: Cascade)
+  reviewerId: string
+  occurredAt: date      @default(now)
+  lastUpdate: date      @updatedAt
+}

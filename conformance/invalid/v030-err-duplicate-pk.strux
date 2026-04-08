@@ -1,0 +1,8 @@
+// conformance/invalid/v030-err-duplicate-pk.strux
+// Expected diagnostic: E_DUPLICATE_PK
+// A record may have at most one @pk field.
+
+@type BadRecord {
+  id:   string  @pk
+  uuid: string  @pk
+}

@@ -1,0 +1,8 @@
+// conformance/invalid/v030-err-pk-on-union.strux
+// Expected diagnostic: E_PK_ON_UNION
+// @pk is not allowed on fields inside a union type.
+
+@type BadUnion = union {
+  a: string @pk
+  b: number
+}

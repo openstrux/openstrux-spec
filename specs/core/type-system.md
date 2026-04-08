@@ -177,13 +177,152 @@ Stream target paths (`stream.kafka`, `stream.pubsub`, `stream.kinesis`) have req
 
 ---
 
-## 7. Grammar
+## 7. Persistence Annotations
+
+`@type` records may carry persistence annotations that describe how fields map to a database schema.
+These annotations are translated to Prisma directives by the generator (see `specs/modules/target-nextjs/`).
+
+### Field-Level Annotations
+
+Field annotations appear inline after the field type:
+
+```
+@type Proposal @timestamps {
+  id:       string    @pk
+  title:    string
+  authorId: string
+  author:   Applicant @relation(field: authorId, ref: Applicant.id, onDelete: Cascade)
+  email:    string    @unique
+  status:   string    @default("pending")
+  note:     string    @column("internal_note") @ignore
+  @@index([authorId, status])
+  @@table("proposals")
+}
+```
+
+| Annotation | Meaning | Prisma output |
+|---|---|---|
+| `@pk` | Primary key; generator infers default (`cuid` for string, `autoincrement` for int) | `@id @default(cuid())` |
+| `@pk(default: uuid)` | Primary key with explicit generator | `@id @default(uuid())` |
+| `@default(now)` | Timestamp default | `@default(now())` |
+| `@default(true\|false\|"val"\|number)` | Scalar default | `@default(value)` |
+| `@unique` | Unique constraint | `@unique` |
+| `@relation(field: f, ref: M.f)` | Foreign key (owned side); inverse array auto-emitted on referenced type | `@relation(fields: [...], references: [...])` |
+| `@updatedAt` | Auto-update timestamp | `@updatedAt` |
+| `@column("name")` | Map field to DB column name | `@map("name")` |
+| `@ignore` | Exclude from generated client | `@ignore` |
+
+**Validator aliases (emit `W_ANNOTATION_ALIAS`, build continues):**
+
+| Alias | Canonical |
+|---|---|
+| `@id` | `@pk` |
+| `@map("col")` | `@column("col")` |
+| `@@map("tbl")` | `@@table("tbl")` |
+
+### Block-Level Annotations
+
+Block annotations appear as standalone statements inside a `@type` record body:
+
+| Annotation | Meaning | Prisma output |
+|---|---|---|
+| `@@index([f1, f2])` | Composite index | `@@index([f1, f2])` |
+| `@@unique([f1, f2])` | Composite unique constraint | `@@unique([f1, f2])` |
+| `@@table("name")` | Map type to DB table name | `@@map("name")` |
+| `@opaque <content>` | Preserve unmodelled DB feature (not interpreted; emitted as comment) | `// @opaque <content>` |
+
+### Type-Level Decorators
+
+Decorators appear on the `@type` declaration line:
+
+| Decorator | Meaning |
+|---|---|
+| `@timestamps` | Auto-inject `createdAt: date @default(now)` and `updatedAt: date @updatedAt` into the record body before code generation |
+| `@sealed` | Sealed record; cannot be redefined by `.strux` source files |
+
+### `@external` Type Modifier
+
+`@external type Name { ... }` declares a type that exists in the database but is not owned by this Openstrux project:
+
+- Participates in the type system (can be referenced in `@relation`, used in panels, Zod schemas generated).
+- The generator emits **no `model` block** for external types.
+- External types **must not** carry `@pk` (validator error: `E_EXTERNAL_PK`).
+- A `W_EXTERNAL_RELATION` warning is emitted when an owned type has a `@relation` to an `@external` type.
+
+```
+@external type LegacyUser { id: string, email: string }
+
+@type Submission {
+  id:       string    @pk
+  owner:    LegacyUser @relation(field: ownerId, ref: LegacyUser.id)
+  ownerId:  string
+}
+```
+
+### AST Node Types (IR additions, v0.6)
+
+**`FieldAnnotation`** — union of individual annotation nodes; added to `FieldDecl`:
+
+```typescript
+type FieldAnnotation =
+  | { kind: "pk";        default?: "cuid" | "uuid" | "ulid" | "autoincrement" }
+  | { kind: "default";   value: "now" | string | number | boolean }
+  | { kind: "unique" }
+  | { kind: "relation";  field: string; ref: { model: string; field: string };
+      onDelete?: "Cascade" | "SetNull" | "Restrict" | "NoAction";
+      onUpdate?: "Cascade" | "SetNull" | "Restrict" | "NoAction" }
+  | { kind: "updatedAt" }
+  | { kind: "column";    name: string }
+  | { kind: "ignore" }
+```
+
+**`TypeBlockAnnotation`** — union of block-level annotation nodes; added to `TypeRecord`:
+
+```typescript
+type TypeBlockAnnotation =
+  | { kind: "index";   fields: string[] }
+  | { kind: "unique";  fields: string[] }
+  | { kind: "table";   name: string }
+  | { kind: "opaque";  content: string }
+```
+
+**`TypeRecord` additions:**
+
+```typescript
+interface TypeRecord {
+  // existing fields...
+  external:    boolean;          // true if @external modifier is present
+  timestamps:  boolean;          // true if @timestamps decorator is present
+  annotations: TypeBlockAnnotation[];   // block-level annotations
+  // FieldDecl extended:
+  //   fields: (FieldDecl & { annotations: FieldAnnotation[] })[]
+}
+```
+
+### Validator Rules (v0.6)
+
+| Code | Severity | Condition |
+|---|---|---|
+| `E_DUPLICATE_PK` | error | More than one field with `@pk` in a record |
+| `E_PK_ON_UNION` | error | `@pk` applied to a field in a `@type union` |
+| `E_EXTERNAL_PK` | error | `@pk` on a field in an `@external type` |
+| `E_TIMESTAMPS_DUPLICATE` | error | `@timestamps` present and `createdAt` or `updatedAt` also declared explicitly |
+| `E_UNRESOLVED_RELATION_REF` | error | `@relation ref` does not resolve to an existing `@type` in scope |
+| `E_MISSING_RELATION_FIELD` | error | `@relation field` does not exist on the owning type |
+| `E_UPDATEDAT_TYPE_MISMATCH` | error | `@updatedAt` applied to a non-`date` field |
+| `E_UNKNOWN_ANNOTATION` | error | Annotation name not in the known set and not a recognised alias |
+| `W_ANNOTATION_ALIAS` | warning | Prisma-familiar alias used; build continues with canonical annotation |
+| `W_EXTERNAL_RELATION` | warning | Owned type has `@relation` pointing to an `@external` type |
+
+---
+
+## 8. Grammar
 
 Formal EBNF for type definitions: see [grammar.md §2](grammar.md).
 
 ---
 
-## 8. Privacy Type System
+## 9. Privacy Type System
 
 The following types support the `private-data` standard rod and the `@privacy` decorator.
 They are defined here as core types, available to any `.strux` project without explicit import.
@@ -283,7 +422,7 @@ classifications. The author need not populate `classification` manually.
 
 ---
 
-## 9. Standard Personal Data Models
+## 10. Standard Personal Data Models
 
 A set of pre-classified `@type` definitions ships with core at
 `specs/modules/types/standard/personal-data/`. These types are available without explicit import.
@@ -342,7 +481,7 @@ Full definitions: [specs/modules/types/standard/personal-data/](../modules/types
 
 ---
 
-## 11. Grammar (updated)
+## 11. Grammar (updated — see §8)
 
 Formal EBNF for type definitions including generic forms: see [grammar.md §2](grammar.md).
 Generic type references (e.g., `PrivateData<T>`) follow the container form:

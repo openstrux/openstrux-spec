@@ -1,0 +1,8 @@
+// conformance/invalid/v030-err-timestamps-duplicate.strux
+// Expected diagnostic: E_TIMESTAMPS_DUPLICATE
+// When @timestamps is present, authors must not declare createdAt or updatedAt explicitly.
+
+@type Proposal @timestamps {
+  id:        string  @pk
+  createdAt: date    @default(now)
+}

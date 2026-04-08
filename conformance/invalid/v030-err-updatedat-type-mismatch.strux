@@ -1,0 +1,8 @@
+// conformance/invalid/v030-err-updatedat-type-mismatch.strux
+// Expected diagnostic: E_UPDATEDAT_TYPE_MISMATCH
+// @updatedAt is only valid on date fields.
+
+@type Post {
+  id:        string  @pk
+  updatedAt: string  @updatedAt
+}

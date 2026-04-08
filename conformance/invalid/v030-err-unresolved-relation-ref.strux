@@ -1,0 +1,10 @@
+// conformance/invalid/v030-err-unresolved-relation-ref.strux
+// Expected diagnostic: E_UNRESOLVED_RELATION_REF
+// @relation ref must resolve to a known @type in scope.
+
+@type Post {
+  id:       string  @pk
+  authorId: string
+  author:   Person  @relation(field: authorId, ref: Person.id)
+}
+// @type Person is not declared — ref must fail.

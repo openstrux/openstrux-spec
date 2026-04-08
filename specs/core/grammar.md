@@ -1,4 +1,4 @@
-# OpenStrux v0.4 — Formal Grammar
+# OpenStrux v0.6 — Formal Grammar
 
 This section defines the formal grammar for OpenStrux v0.4 in EBNF
 notation. Productions are derived from
@@ -30,17 +30,56 @@ top_level_decl = type_def | panel_def | context_def ;
 Derived from [type-system.md §7](type-system.md).
 
 ```ebnf
-type_def      = "@type" name "=" "union" "{" union_body "}"
-              | "@type" name "=" "enum" "{" enum_body "}"
-              | "@type" name "{" record_body "}" ;
+type_def      = type_decl_record | type_decl_enum | type_decl_union ;
+
+(* Records: optional @external modifier and/or @timestamps decorator *)
+type_decl_record = [ "@external" ] "@type" name { type_decorator } "{" record_body "}" ;
+type_decl_enum   = "@type" name "=" "enum" "{" enum_body "}" ;
+type_decl_union  = "@type" name "=" "union" "{" union_body "}" ;
+
+(* Type-level decorators on the @type declaration line *)
+type_decorator   = "@timestamps" | "@sealed" ;
 
 union_body    = { variant } ;
 variant       = name ":" type_expr ;
 
 enum_body     = name { "," name } ;
 
-record_body   = { field_decl } ;
-field_decl    = name ":" type_expr ;
+record_body   = { field_decl | block_annotation } ;
+field_decl    = name ":" type_expr { field_annotation } ;
+
+(* Field-level annotations — appear inline after the field type *)
+field_annotation  = "@pk" [ "(" "default" ":" pk_default ")" ]
+                  | "@default" "(" default_value ")"
+                  | "@unique"
+                  | "@relation" "(" relation_args ")"
+                  | "@updatedAt"
+                  | "@column" "(" string ")"
+                  | "@ignore"
+                  (* Prisma-familiar aliases — normalised at validation, emit W_ANNOTATION_ALIAS *)
+                  | "@id" [ "(" "default" ":" pk_default_alias ")" ]
+                  | "@map" "(" string ")" ;
+
+pk_default       = "cuid" | "uuid" | "ulid" | "autoincrement" ;
+pk_default_alias = "cuid()" | "uuid()" | "ulid()" | "autoincrement()" ;
+
+default_value    = "now" | "true" | "false" | string | number ;
+
+relation_args    = "field" ":" name "," "ref" ":" name "." name
+                   [ "," "onDelete" ":" referential_action ]
+                   [ "," "onUpdate" ":" referential_action ] ;
+referential_action = "Cascade" | "SetNull" | "Restrict" | "NoAction" ;
+
+(* Block-level annotations — inside @type body, not attached to a single field *)
+block_annotation  = "@@index"  "(" "[" name { "," name } "]" ")"
+                  | "@@unique" "(" "[" name { "," name } "]" ")"
+                  | "@@table"  "(" string ")"
+                  | "@opaque"  raw_opaque_content
+                  (* Prisma-familiar alias — normalised at validation, emit W_ANNOTATION_ALIAS *)
+                  | "@@map"    "(" string ")" ;
+
+(* @opaque captures everything until end of line; compiler preserves but does not interpret *)
+raw_opaque_content = (* remainder of statement line *) ;
 
 type_expr     = primitive
               | container
@@ -358,7 +397,7 @@ normalization rules and ADR-006 for the design rationale.
 
 ## Scope
 
-This grammar is normative for OpenStrux v0.4. A conformant parser MUST
+This grammar is normative for OpenStrux v0.6. A conformant parser MUST
 accept all productions defined here. Productions marked with
 `(* TODO: expand *)` are known incomplete and will be refined in future
 spec versions.

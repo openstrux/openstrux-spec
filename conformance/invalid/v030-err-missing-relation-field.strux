@@ -1,0 +1,11 @@
+// conformance/invalid/v030-err-missing-relation-field.strux
+// Expected diagnostic: E_MISSING_RELATION_FIELD
+// The local field named in @relation(field:) must exist on the owning type.
+
+@type User { id: string @pk }
+
+@type Post {
+  id:     string  @pk
+  author: User    @relation(field: nonExistentId, ref: User.id)
+}
+// nonExistentId is not a field on Post — must fail.

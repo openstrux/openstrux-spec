@@ -1,0 +1,8 @@
+// conformance/invalid/v030-err-external-pk.strux
+// Expected diagnostic: E_EXTERNAL_PK
+// @external types must not carry @pk — they do not own their DDL.
+
+@external type LegacyUser {
+  id:    string  @pk
+  email: string
+}

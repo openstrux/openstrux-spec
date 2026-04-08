@@ -16,12 +16,70 @@ design, human-translatable, structure-first, trust built in.
 @type Name = enum { val1, val2, val3 }                      // enum
 @type Name = union { tag1: Type1, tag2: Type2 }             // union
 @type Name @sealed { field: Type }                          // sealed record (standard types only)
+@type Name @timestamps { field: Type }                      // auto-inject createdAt + updatedAt
+@external @type Name { field: Type }                         // external (non-owned) type — no DDL emitted
 ```
 
 Primitives: `string`, `number`, `bool`, `date`, `bytes`.
 Containers: `Optional<T>`, `Batch<T>`, `Map<K,V>`, `Single<T>`, `Stream<T>`.
 Generic built-in: `PrivateData<T>` — personal data wrapper (see §Privacy).
 Constraint: `number [0..100]`, `string ["a","b","c"]`.
+
+## Persistence Annotations
+
+Field-level annotations appear inline after the field type. Block-level annotations (`@@`) appear as standalone lines inside the record body.
+
+```
+@type Proposal @timestamps {
+  id:       string    @pk
+  title:    string
+  authorId: string
+  author:   Applicant @relation(field: authorId, ref: Applicant.id, onDelete: Cascade)
+  email:    string    @unique
+  status:   string    @default("pending")
+  note:     string    @column("internal_note") @ignore
+  @@index([authorId, status])
+  @@table("proposals")
+}
+
+@external @type LegacyUser { id: string, email: string }     // DDL not emitted; valid relation target
+```
+
+### Field-level annotation table
+
+| Annotation | Prisma output |
+|---|---|
+| `@pk` | `@id @default(cuid())` (string) / `@id @default(autoincrement())` (int) |
+| `@pk(default: uuid\|cuid\|ulid\|autoincrement)` | `@id @default(<generator>())` |
+| `@default(now)` | `@default(now())` |
+| `@default(true\|false\|"val"\|number)` | `@default(<literal>)` |
+| `@unique` | `@unique` |
+| `@relation(field: f, ref: M.f)` | `@relation(fields: [f], references: [f])`; inverse array auto-added |
+| `@relation(..., onDelete: Cascade\|SetNull\|Restrict\|NoAction)` | adds `onDelete: ...` |
+| `@updatedAt` | `@updatedAt` |
+| `@column("name")` | `@map("name")` |
+| `@ignore` | `@ignore` |
+
+### Block-level annotation table
+
+| Annotation | Prisma output |
+|---|---|
+| `@@index([f1, f2])` | `@@index([f1, f2])` |
+| `@@unique([f1, f2])` | `@@unique([f1, f2])` |
+| `@@table("name")` | `@@map("name")` |
+| `@opaque <content>` | `// @opaque <content>` (comment; not interpreted by compiler) |
+
+### Alias leniency
+
+The validator accepts Prisma-style aliases and emits a `W_ANNOTATION_ALIAS` warning; the build continues:
+
+| Alias | Canonical |
+|---|---|
+| `@id` | `@pk` |
+| `@map("col")` | `@column("col")` |
+| `@@map("tbl")` | `@@table("tbl")` |
+
+Unknown annotations that are not in the table or alias list produce `E_UNKNOWN_ANNOTATION` (hard error).
 
 ## Type Paths
 

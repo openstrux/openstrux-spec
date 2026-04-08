@@ -1,7 +1,9 @@
 # ADR-020: Brownfield Database Support
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-03-21
+- **Accepted:** 2026-04-07
+- **Implemented by:** openstrux change `type-persistence-annotations`
 - **Context:** OpenStrux assumes greenfield projects: the generator emits a
   complete Prisma schema and the database is created from scratch. Real
   adoption requires entering projects with existing databases — tables,
